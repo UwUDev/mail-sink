@@ -1,1 +1,6 @@
 /target
+/.
+/key.pem
+/cert.pem
+/db/
+.idea/
