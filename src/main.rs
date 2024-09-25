@@ -32,15 +32,31 @@ async fn main() -> Result<(), SharedError> {
     let db = Arc::new(Mutex::new(sled::open("db")?));
 
     let db_clone = db.clone();
+    let tls_clone = tls_config.clone();
     let smtp_handle =
-        task::spawn(async move { run_smtp_service(tls_config.clone(), db_clone, args.smtp_port).await });
+        task::spawn(async move { run_smtp_service(tls_clone.clone(), db_clone, args.smtp_port).await });
 
     let db_clone = db.clone();
     let service_handle =
         task::spawn(async move { run_http_service(db_clone, args.http_port, args.key.clone()).await });
 
-    // wait for both services to complete (it should never happen)
-    let _ = tokio::try_join!(smtp_handle, service_handle)?;
+    let secondary_smtp_handle = if let Some(port) = args.secondary_smtp_port {
+        let tls_config = tls_config.clone();
+        let db = db.clone();
+        Some(task::spawn(async move { run_smtp_service(tls_config, db, port).await }))
+    } else {
+        None
+    };
+
+    // wait for all services to complete (it should never happen)
+    match secondary_smtp_handle {
+        Some(handle) => {
+            let _ = tokio::try_join!(smtp_handle, service_handle, handle)?;
+        }
+        None => {
+            let _ = tokio::try_join!(smtp_handle, service_handle)?;
+        }
+    }
 
     Ok(())
 }

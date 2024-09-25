@@ -13,10 +13,10 @@ pub struct Args {
     #[arg(
         short,
         long,
-        help = "Not implemented yet.",
+        help = "Allows to bind the SMTP server to a secondary port",
         value_name = "SMTP PORT"
     )]
-    pub secondary_smtp_port: Option<u16>, // TODO: Implement this
+    pub secondary_smtp_port: Option<u16>,
 
     #[arg(long, default_value = "8080", value_name = "HTTP PORT")]
     pub http_port: u16,
