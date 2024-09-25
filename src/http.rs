@@ -47,6 +47,7 @@ type Handler = Box<
 >;
 
 // Define a simple Request struct
+#[allow(dead_code)] // will be used later
 struct Request {
     method: Method,
     path: String,
@@ -144,8 +145,12 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             "/mails/:mail_id".to_string(),
             Box::new(|request, writer, db| Box::pin(delete_mail_handler(request, writer, db))),
         ),
+        (
+            Method::GET,
+            "/mails".to_string(),
+            Box::new(|request, writer, db| Box::pin(get_mails_handler(request, writer, db))),
+        ),
         // TODO: Add more routes here:
-        //    - GET /mails              (retrieve all stored emails) with ?limit=<number> query parameter and ?offset=<number> query parameter
         //    - DELETE /mails           (delete all stored emails)
         //    - GET /preview/<mail_id>  (visual preview of the email)
         //    - GET /panel              (admin panel to view all emails and delete them)
@@ -245,6 +250,48 @@ async fn delete_mail_handler(
     } else {
         writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
     }
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn get_mails_handler(
+    request: Request,
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let limit = request.query.get("limit").unwrap_or(&String::from("10")).parse::<usize>().unwrap();
+    let offset = request.query.get("offset").unwrap_or(&String::from("0")).parse::<usize>().unwrap();
+
+    let db = db.lock().await;
+    let mut iter = db.iter();
+    let mut mails = Vec::new();
+    let mut count = 0;
+
+    for _ in 0..offset {
+        if iter.next().is_none() {
+            break;
+        }
+    }
+
+    while let Some(result) = iter.next() {
+        let (_, data) = result?;
+        let mail: Mail = bincode::deserialize(&data)?;
+        mails.push(mail);
+        count += 1;
+        if count >= limit {
+            break;
+        }
+    }
+
+    let json = serde_json::to_string(&mails)?;
+
+    let mut writer = writer.lock().await;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer.write_all(b"Content-Type: application/json\r\n").await?;
+    writer.write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes()).await?;
+    writer.write_all(b"\r\n").await?;
+    writer.write_all(json.as_bytes()).await?;
+
     writer.flush().await?;
     Ok(())
 }
