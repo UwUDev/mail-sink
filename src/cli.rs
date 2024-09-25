@@ -47,7 +47,7 @@ Sink server running on a higher port number.
 
 pub fn print_api_usage() {
     println!("{}", "API access:".bold());
-    println!("The HTTP API is accessible by adding ?key=your_key to the URL.");
+    println!("The HTTP API is accessible by adding ?k=your_key to the URL.");
     println!();
     println!(
         "- {} {}             Retrieve all stored emails (JSON format)",
@@ -58,6 +58,10 @@ pub fn print_api_usage() {
         "- {} {}     Retrieve a specific email (JSON format)",
         "GET".blue(),
         "/mails/<email>".bold()
+    );
+    println!(
+        "  • {}: ?limit and ?offset for pagination",
+        "Parameters".bright_black()
     );
     println!(
         "- {} {}  Delete a specific email",
