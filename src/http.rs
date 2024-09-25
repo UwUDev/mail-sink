@@ -4,6 +4,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
 
@@ -153,7 +154,7 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
         (
             Method::DELETE,
             "/mails".to_string(),
-            Box::new(|request, writer, db| Box::pin(delete_mails_handler(writer, db))),
+            Box::new(|_, writer, db| Box::pin(delete_mails_handler(writer, db))),
         ),
         // TODO: Add more routes here:
         //    - GET /preview/<mail_id>  (visual preview of the email)
@@ -208,9 +209,7 @@ async fn get_mail_handler(
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
     db: Arc<Mutex<Db>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    println!("GET /mails/:mail_id");
     let mail_id = request.params.get("mail_id").unwrap();
-    println!("Mail ID: {}", mail_id);
 
     let db = db.lock().await;
     let result = db.get(mail_id.as_bytes());
@@ -218,9 +217,10 @@ async fn get_mail_handler(
     let mut writer = writer.lock().await;
 
     if let Ok(Some(data)) = result {
-        println!("Mail found!");
         let mail: Mail = bincode::deserialize(&data)?;
-        let json = serde_json::to_string(&mail)?;
+        let mut json = serde_json::to_value(&mail)?;
+        json["body"] = Value::String(mail.parse_body());
+        let json = serde_json::to_string(&json)?;
 
         writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
         writer.write_all(b"Content-Type: application/json\r\n").await?;
@@ -287,7 +287,14 @@ async fn get_mails_handler(
         }
     }
 
-    let json = serde_json::to_string(&mails)?;
+    let mut mails_json = Vec::new();
+    for mail in &mails {
+        let mut json: Value = serde_json::to_value(mail)?;
+        let parsed_body = mail.parse_body();
+        json["body"] = Value::String(parsed_body);
+        mails_json.push(json);
+    }
+    let json = serde_json::to_string(&mails_json)?;
 
     let mut writer = writer.lock().await;
     writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;

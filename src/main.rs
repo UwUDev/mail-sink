@@ -89,7 +89,6 @@ async fn run_smtp_service(
                         let bytes = bincode::serialize(&mail).unwrap();
                         println!("To: {:?}", mail.to);
                         let to = mail.to.iter().next().unwrap().to_owned();
-                        println!("Inserting mail to {} to db", to);
                         db.insert(to, bytes).unwrap();
                     }
                 }

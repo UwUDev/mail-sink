@@ -19,6 +19,15 @@ pub struct Mail {
     pub data: String,
 }
 
+impl Mail {
+    pub fn parse_body(&self) -> String {
+        let mut body = self.data.clone();
+        if let Some(index) = body.find("\r\n\r\n") {
+            body = body.split_off(index + 4);
+        }
+        body
+    }
+}
 pub(crate) async fn handle_client(
     stream: TcpStream,
     tls_config: Arc<ServerConfig>,
@@ -47,7 +56,6 @@ pub(crate) async fn handle_client(
 
         let command = line.trim_end();
         let command_upper = command.to_uppercase();
-        println!("Received from {}: {}", peer_addr, command);
 
         if command_upper.starts_with("EHLO") || command_upper.starts_with("HELO") {
             writer.write_all(b"250-localhost\r\n").await?;
@@ -64,7 +72,7 @@ pub(crate) async fn handle_client(
             let acceptor = TlsAcceptor::from(tls_config.clone());
             let tls_stream = acceptor.accept(stream).await?;
 
-            let tls_mail = handle_tls_client(tls_stream, peer_addr).await;
+            let tls_mail = handle_tls_client(tls_stream).await;
             match tls_mail {
                 Ok(m) => {
                     from = m.from;
@@ -104,7 +112,6 @@ pub(crate) async fn handle_client(
             }
 
             body = data.clone();
-            println!("Email data from {}:\n{}", peer_addr, data);
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper == "QUIT" {
             // reunite the read and write halves
@@ -128,13 +135,11 @@ pub(crate) async fn handle_client(
 
 async fn handle_tls_client(
     stream: tokio_rustls::server::TlsStream<TcpStream>,
-    peer_addr: SocketAddr,
+    //peer_addr: SocketAddr,
 ) -> Result<Mail, Box<dyn Error>> {
     let (read_half, write_half) = tokio::io::split(stream);
     let mut reader = BufReader::new(read_half);
     let mut writer = write_half;
-
-    println!("TLS connection established with {}", peer_addr);
 
     let mut from = HashSet::new();
     let mut to = HashSet::new();
@@ -151,7 +156,6 @@ async fn handle_tls_client(
 
         let command = line.trim_end();
         let command_upper = command.to_uppercase();
-        println!("Received over TLS from {}: {}", peer_addr, command);
 
         if command_upper.starts_with("EHLO") || command_upper.starts_with("HELO") {
             writer.write_all(b"250-localhost\r\n").await?;
@@ -185,7 +189,6 @@ async fn handle_tls_client(
 
             body = data.clone();
 
-            println!("Email data over TLS from {}:\n{}", peer_addr, data);
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper == "QUIT" {
             break;
