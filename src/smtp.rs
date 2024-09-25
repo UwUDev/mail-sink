@@ -124,8 +124,6 @@ pub(crate) async fn handle_client(
         }
     }
 
-    println!("to: {:?}", to);
-
     Ok(Mail {
         from,
         to,

@@ -87,7 +87,6 @@ async fn run_smtp_service(
                     if mail.from.len() > 0 && mail.to.len() > 0 && mail.data.len() > 20 {
                         let db = db.lock().await;
                         let bytes = bincode::serialize(&mail).unwrap();
-                        println!("To: {:?}", mail.to);
                         let to = mail.to.iter().next().unwrap().to_owned();
                         db.insert(to, bytes).unwrap();
                     }
