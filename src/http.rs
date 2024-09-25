@@ -84,7 +84,8 @@ pub(crate) async fn handle_client(
             writer.write_all(json.as_bytes()).await?;
 
             if delete {
-                db.remove(mail.to.iter().next().unwrap().as_bytes()).unwrap();
+                db.remove(mail.to.iter().next().unwrap().as_bytes())
+                    .unwrap();
             }
         } else {
             writer.write_all(b"HTTP/1.1 404 Not Found\r\n").await?;

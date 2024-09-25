@@ -1,6 +1,10 @@
+mod cli;
 mod http;
 mod smtp;
 
+use crate::cli::*;
+use clap::{CommandFactory, Parser};
+use clap_help::Printer;
 use sled::Db;
 use std::error::Error;
 use std::sync::Arc;
@@ -13,13 +17,18 @@ type SharedError = Box<dyn Error + Send + Sync>;
 
 #[tokio::main]
 async fn main() -> Result<(), SharedError> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() != 2 {
-        eprintln!("Usage: {} <port>", args[0]);
-        std::process::exit(1);
+    let args: Args = Args::parse();
+    if args.help {
+        Printer::new(Args::command())
+            .with("introduction", INTRO)
+            .without("author")
+            .print_help();
+
+        print_api_usage();
+        return Ok(());
     }
 
-    let port = args[1].parse::<u16>().unwrap();
+    let port = args.smtp_port;
 
     let tls_config = Arc::new(smtp::load_tls_config()?);
     let db = Arc::new(Mutex::new(sled::open("db")?));
@@ -29,7 +38,8 @@ async fn main() -> Result<(), SharedError> {
         task::spawn(async move { run_smtp_service(tls_config.clone(), db_clone, port).await });
 
     let db_clone = db.clone();
-    let service_handle = task::spawn(async move { run_http_service(db_clone, 8080).await });
+    let service_handle =
+        task::spawn(async move { run_http_service(db_clone, args.http_port).await });
 
     // wait for both services to complete (it should never happen)
     let _ = tokio::try_join!(smtp_handle, service_handle)?;
