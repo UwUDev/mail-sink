@@ -150,8 +150,12 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             "/mails".to_string(),
             Box::new(|request, writer, db| Box::pin(get_mails_handler(request, writer, db))),
         ),
+        (
+            Method::DELETE,
+            "/mails".to_string(),
+            Box::new(|request, writer, db| Box::pin(delete_mails_handler(writer, db))),
+        ),
         // TODO: Add more routes here:
-        //    - DELETE /mails           (delete all stored emails)
         //    - GET /preview/<mail_id>  (visual preview of the email)
         //    - GET /panel              (admin panel to view all emails and delete them)
         //    - POST /info              (basic info about the server, mail count, etc.)
@@ -292,6 +296,19 @@ async fn get_mails_handler(
     writer.write_all(b"\r\n").await?;
     writer.write_all(json.as_bytes()).await?;
 
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn delete_mails_handler(
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let db = db.lock().await;
+    db.clear().unwrap();
+
+    let mut writer = writer.lock().await;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await?;
     writer.flush().await?;
     Ok(())
 }
