@@ -28,18 +28,16 @@ async fn main() -> Result<(), SharedError> {
         return Ok(());
     }
 
-    let port = args.smtp_port;
-
     let tls_config = Arc::new(smtp::load_tls_config()?);
     let db = Arc::new(Mutex::new(sled::open("db")?));
 
     let db_clone = db.clone();
     let smtp_handle =
-        task::spawn(async move { run_smtp_service(tls_config.clone(), db_clone, port).await });
+        task::spawn(async move { run_smtp_service(tls_config.clone(), db_clone, args.smtp_port).await });
 
     let db_clone = db.clone();
     let service_handle =
-        task::spawn(async move { run_http_service(db_clone, args.http_port).await });
+        task::spawn(async move { run_http_service(db_clone, args.http_port, args.key.clone()).await });
 
     // wait for both services to complete (it should never happen)
     let _ = tokio::try_join!(smtp_handle, service_handle)?;
@@ -87,7 +85,7 @@ async fn run_smtp_service(
     }
 }
 
-async fn run_http_service(db: Arc<Mutex<Db>>, i: u16) -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn run_http_service(db: Arc<Mutex<Db>>, i: u16, key: String) -> Result<(), Box<dyn Error + Send + Sync>> {
     // bind the TCP listener to the address
     let listener = TcpListener::bind(format!("0.0.0.0:{}", i)).await?;
     println!("HTTP server running on port {}", i);
@@ -99,8 +97,9 @@ async fn run_http_service(db: Arc<Mutex<Db>>, i: u16) -> Result<(), Box<dyn Erro
 
         // handle the connection (implement your service logic here)
         let db = db.clone();
+        let key = key.clone();
         tokio::spawn(async move {
-            if let Err(e) = http::handle_client(socket, db).await {
+            if let Err(e) = http::handle_client(socket, db, key.as_str()).await {
                 println!("Error handling client {}: {:?}", addr, e);
             }
         });

@@ -1,100 +1,250 @@
+use std::collections::HashMap;
 use sled::Db;
 use std::error::Error;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
 
-const KEY: &str = "feur";
+
+use tokio::sync::{Mutex as AsyncMutex, Mutex};
 
 use crate::smtp::Mail;
 use url::form_urlencoded;
 use url::Url;
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum Method {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    // Add other methods as needed
+}
+
+impl Method {
+    fn from_str(method: &str) -> Option<Method> {
+        match method.to_uppercase().as_str() {
+            "GET" => Some(Method::GET),
+            "POST" => Some(Method::POST),
+            "PUT" => Some(Method::PUT),
+            "DELETE" => Some(Method::DELETE),
+            _ => None,
+        }
+    }
+}
+
+// Define a type alias for the handler function
+type Handler = Box<
+    dyn Fn(
+        Request,
+        Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+        Arc<Mutex<Db>>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error + Send + Sync>>> + Send>>
+    + Send
+    + Sync,
+>;
+
+// Define a simple Request struct
+struct Request {
+    method: Method,
+    path: String,
+    query: HashMap<String, String>,
+    params: HashMap<String, String>,
+}
+
 pub(crate) async fn handle_client(
     stream: TcpStream,
     db: Arc<Mutex<Db>>,
+    key: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let (reader, writer) = stream.into_split();
-
     let mut reader = BufReader::new(reader);
-    let mut writer = writer;
-    let mut line = String::new();
-    let bytes_read = reader.read_line(&mut line).await?;
+    let writer = Arc::new(AsyncMutex::new(BufWriter::new(writer)));
+
+    // Read the request line
+    let mut request_line = String::new();
+    let bytes_read = reader.read_line(&mut request_line).await?;
     if bytes_read == 0 {
-        // connection closed (very sad moment)
         return Ok(());
     }
 
-    let command = line.trim_end().split(' ');
-    // the second element of the split is the command (GET command HTTP/x.x)
-    let command = command.collect::<Vec<&str>>()[1];
-    let command = "http://localhost:8080/".to_string() + command;
-    println!("Received command: {}", command);
-    let url = Url::parse(&command)?;
+    // Parse the request line
+    let request_line = request_line.trim_end();
+    let mut parts = request_line.split_whitespace();
+    let method_str = parts.next();
+    let path_and_query = parts.next();
+    let _version = parts.next();
 
-    let query = url.query().unwrap_or("");
-    let params: Vec<(String, String)> = form_urlencoded::parse(query.as_bytes())
-        .into_owned()
-        .collect();
+    if let (Some(method_str), Some(path_and_query)) = (method_str, path_and_query) {
+        // parse the method
+        let method = Method::from_str(method_str);
+        if method.is_none() {
+            // Method isn't Allowed
+            writer.lock().await.get_mut().shutdown().await?;
+            return Ok(());
+        }
+        let method = method.unwrap();
 
-    let mail = params
-        .iter()
-        .find(|(key, _)| key == "mail")
-        .map(|(_, value)| value.clone());
+        // parse the URL to handle path and query parameters
+        let url = Url::parse(&format!("http://localhost{}", path_and_query))?;
+        let path = url.path().to_string();
+        let query_pairs = form_urlencoded::parse(url.query().unwrap_or("").as_bytes())
+            .into_owned()
+            .collect::<HashMap<String, String>>();
 
-    let k = params
-        .iter()
-        .find(|(key, _)| key == "k")
-        .map(|(_, value)| value.clone());
-
-    // false if not present
-    let delete = params.iter().find(|(key, _)| key == "delete").is_some();
-
-    if k.is_none() || mail.is_none() {
-        return Ok(());
-    }
-
-    let mail = mail.unwrap();
-    let k = k.unwrap();
-
-    if k != KEY {
-        return Ok(());
-    }
-
-    let db = db.lock().await;
-    let result = db.get(mail.as_bytes());
-    if result.is_ok() {
-        let result = result.unwrap();
-        if result.is_some() {
-            let result = result.unwrap();
-            let mail: Mail = bincode::deserialize(&result).unwrap();
-            let json = serde_json::to_string(&mail).unwrap();
-
-            // http response
-            writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
-            writer
-                .write_all(b"Content-Type: application/json\r\n")
-                .await?;
-            let len = json.len().to_string();
-            writer.write_all(b"Content-Length: ").await?;
-            writer.write_all(len.as_bytes()).await?;
-            writer.write_all(b"\r\n").await?;
-            writer.write_all(b"\r\n").await?;
-            writer.write_all(json.as_bytes()).await?;
-
-            if delete {
-                db.remove(mail.to.iter().next().unwrap().as_bytes())
-                    .unwrap();
+        // check if the key is provided and valid before proceeding
+        if let Some(k) = query_pairs.get("k") {
+            if k != key {
+                // 403 Forbidden, just close the connection without any response to avoid leaking information
+                writer.lock().await.get_mut().shutdown().await?;
+                return Ok(());
             }
         } else {
-            writer.write_all(b"HTTP/1.1 404 Not Found\r\n").await?;
+            // 401 Unauthorized, just close the connection without any response to avoid leaking information
+            writer.lock().await.get_mut().shutdown().await?;
+            return Ok(());
+        }
+
+        let routes = build_routes();
+        if let Some((handler, params)) = find_handler(&routes, &method, &path) {
+            let request = Request {
+                method,
+                path,
+                query: query_pairs,
+                params,
+            };
+            handler(request, writer.clone(), db.clone()).await?;
+        } else {
+            let mut writer = writer.lock().await;
+            writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
+            writer.flush().await?;
         }
     } else {
-        writer
-            .write_all(b"HTTP/1.1 500 Internal Server Error\r\n")
-            .await?;
+        // bad request (most likely a skill issue)
+        let mut writer = writer.lock().await;
+        writer.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await?;
+        writer.flush().await?;
     }
 
+    Ok(())
+}
+
+// function to build the routing table
+fn build_routes() -> Vec<(Method, String, Handler)> {
+    vec![
+        (
+            Method::GET,
+            "/mails/:mail_id".to_string(),
+            Box::new(|request, writer, db| Box::pin(get_mail_handler(request, writer, db))),
+        ),
+        (
+            Method::DELETE,
+            "/mails/:mail_id".to_string(),
+            Box::new(|request, writer, db| Box::pin(delete_mail_handler(request, writer, db))),
+        ),
+        // TODO: Add more routes here:
+        //    - GET /mails              (retrieve all stored emails) with ?limit=<number> query parameter and ?offset=<number> query parameter
+        //    - DELETE /mails           (delete all stored emails)
+        //    - GET /preview/<mail_id>  (visual preview of the email)
+        //    - GET /panel              (admin panel to view all emails and delete them)
+        //    - POST /info              (basic info about the server, mail count, etc.)
+    ]
+}
+
+// function to find the appropriate handler
+fn find_handler<'a>(
+    routes: &'a [(Method, String, Handler)],
+    method: &Method,
+    request_path: &str,
+) -> Option<(&'a Handler, HashMap<String, String>)> {
+    for (route_method, route_path, handler) in routes {
+        if method == route_method {
+            if let Some(params) = match_path(route_path, request_path) {
+                return Some((handler, params));
+            }
+        }
+    }
+    None
+}
+
+// function to match paths with parameters
+fn match_path(route_path: &str, request_path: &str) -> Option<HashMap<String, String>> {
+    let route_parts: Vec<&str> = route_path.trim_end_matches('/').split('/').collect();
+    let request_parts: Vec<&str> = request_path.trim_end_matches('/').split('/').collect();
+
+    if route_parts.len() != request_parts.len() {
+        return None;
+    }
+
+    let mut params = HashMap::new();
+
+    for (route_part, request_part) in route_parts.iter().zip(request_parts.iter()) {
+        if route_part.starts_with(':') {
+            let name = route_part.trim_start_matches(':');
+            params.insert(name.to_string(), request_part.to_string());
+        } else if route_part != request_part {
+            return None;
+        }
+    }
+
+    Some(params)
+}
+
+//     HANDLERS     //
+
+async fn get_mail_handler(
+    request: Request,
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("GET /mails/:mail_id");
+    let mail_id = request.params.get("mail_id").unwrap();
+    println!("Mail ID: {}", mail_id);
+
+    let db = db.lock().await;
+    let result = db.get(mail_id.as_bytes());
+
+    let mut writer = writer.lock().await;
+
+    if let Ok(Some(data)) = result {
+        println!("Mail found!");
+        let mail: Mail = bincode::deserialize(&data)?;
+        let json = serde_json::to_string(&mail)?;
+
+        writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+        writer.write_all(b"Content-Type: application/json\r\n").await?;
+        writer
+            .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+            .await?;
+        writer.write_all(b"\r\n").await?;
+        writer.write_all(json.as_bytes()).await?;
+    } else {
+        writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
+    }
+
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn delete_mail_handler(
+    request: Request,
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let mail_id = request.params.get("mail_id").unwrap();
+
+    let db = db.lock().await;
+    let result = db.remove(mail_id.as_bytes());
+
+    let mut writer = writer.lock().await;
+
+    if result.is_ok() {
+        writer.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await?;
+    } else {
+        writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
+    }
+    writer.flush().await?;
     Ok(())
 }
