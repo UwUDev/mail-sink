@@ -8,6 +8,7 @@ use clap_help::Printer;
 use sled::Db;
 use std::error::Error;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tokio::task;
@@ -34,19 +35,33 @@ async fn main() -> Result<(), SharedError> {
     let db_clone = db.clone();
     let tls_clone = tls_config.clone();
     let smtp_handle =
-        task::spawn(async move { run_smtp_service(tls_clone.clone(), db_clone, args.smtp_port).await });
+        task::spawn(
+            async move { run_smtp_service(tls_clone.clone(), db_clone, args.smtp_port).await },
+        );
 
     let db_clone = db.clone();
     let service_handle =
-        task::spawn(async move { run_http_service(db_clone, args.http_port, args.key.clone()).await });
+        task::spawn(
+            async move { run_http_service(db_clone, args.http_port, args.key.clone()).await },
+        );
 
     let secondary_smtp_handle = if let Some(port) = args.secondary_smtp_port {
         let tls_config = tls_config.clone();
         let db = db.clone();
-        Some(task::spawn(async move { run_smtp_service(tls_config, db, port).await }))
+        Some(task::spawn(async move {
+            run_smtp_service(tls_config, db, port).await
+        }))
     } else {
         None
     };
+
+    match args.lifetime {
+        Some(lifetime) => {
+            // spawn a new task, me don't need to wait for it
+            task::spawn(run_cleaner_service(db, lifetime));
+        }
+        _ => {}
+    }
 
     // wait for all services to complete (it should never happen)
     match secondary_smtp_handle {
@@ -99,7 +114,11 @@ async fn run_smtp_service(
     }
 }
 
-async fn run_http_service(db: Arc<Mutex<Db>>, i: u16, key: String) -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn run_http_service(
+    db: Arc<Mutex<Db>>,
+    i: u16,
+    key: String,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     // bind the TCP listener to the address
     let listener = TcpListener::bind(format!("0.0.0.0:{}", i)).await?;
     println!("HTTP server running on port {}", i);
@@ -117,5 +136,41 @@ async fn run_http_service(db: Arc<Mutex<Db>>, i: u16, key: String) -> Result<(),
                 println!("Error handling client {}: {:?}", addr, e);
             }
         });
+    }
+}
+
+async fn run_cleaner_service(
+    db: Arc<Mutex<Db>>,
+    lifetime: u16,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    loop {
+        let db = db.clone();
+        let db = db.lock().await;
+        let mut keys = Vec::new();
+        for key in db.iter() {
+            keys.push(key.unwrap().0);
+        }
+
+        let mut count = 0;
+        for key in keys {
+            let mail = db.get(&key).unwrap().unwrap();
+            let mail: smtp::Mail = bincode::deserialize(&mail).unwrap();
+            let current_millis = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+
+            if current_millis - mail.timestamp > (lifetime as u128 * 60 * 1000) {
+                db.remove(&key).unwrap();
+                count += 1;
+            }
+        }
+
+        drop(db);
+
+        if count > 0 {
+            println!("Cleaned {} emails", count);
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
     }
 }

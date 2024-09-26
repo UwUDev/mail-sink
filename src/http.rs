@@ -1,13 +1,12 @@
-use std::collections::HashMap;
+use serde_json::Value;
 use sled::Db;
+use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
-
 
 use tokio::sync::{Mutex as AsyncMutex, Mutex};
 
@@ -39,12 +38,13 @@ impl Method {
 // Define a type alias for the handler function
 type Handler = Box<
     dyn Fn(
-        Request,
-        Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
-        Arc<Mutex<Db>>,
-    ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error + Send + Sync>>> + Send>>
-    + Send
-    + Sync,
+            Request,
+            Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+            Arc<Mutex<Db>>,
+        )
+            -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error + Send + Sync>>> + Send>>
+        + Send
+        + Sync,
 >;
 
 // Define a simple Request struct
@@ -126,7 +126,9 @@ pub(crate) async fn handle_client(
     } else {
         // bad request (most likely a skill issue)
         let mut writer = writer.lock().await;
-        writer.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await?;
+        writer
+            .write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+            .await?;
         writer.flush().await?;
     }
 
@@ -223,7 +225,9 @@ async fn get_mail_handler(
         let json = serde_json::to_string(&json)?;
 
         writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
-        writer.write_all(b"Content-Type: application/json\r\n").await?;
+        writer
+            .write_all(b"Content-Type: application/json\r\n")
+            .await?;
         writer
             .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
             .await?;
@@ -261,10 +265,20 @@ async fn delete_mail_handler(
 async fn get_mails_handler(
     request: Request,
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
-    db: Arc<Mutex<Db>>
+    db: Arc<Mutex<Db>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let limit = request.query.get("limit").unwrap_or(&String::from("10")).parse::<usize>().unwrap();
-    let offset = request.query.get("offset").unwrap_or(&String::from("0")).parse::<usize>().unwrap();
+    let limit = request
+        .query
+        .get("limit")
+        .unwrap_or(&String::from("10"))
+        .parse::<usize>()
+        .unwrap();
+    let offset = request
+        .query
+        .get("offset")
+        .unwrap_or(&String::from("0"))
+        .parse::<usize>()
+        .unwrap();
 
     let db = db.lock().await;
     let mut iter = db.iter();
@@ -298,8 +312,12 @@ async fn get_mails_handler(
 
     let mut writer = writer.lock().await;
     writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
-    writer.write_all(b"Content-Type: application/json\r\n").await?;
-    writer.write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes()).await?;
+    writer
+        .write_all(b"Content-Type: application/json\r\n")
+        .await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+        .await?;
     writer.write_all(b"\r\n").await?;
     writer.write_all(json.as_bytes()).await?;
 
@@ -309,7 +327,7 @@ async fn get_mails_handler(
 
 async fn delete_mails_handler(
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
-    db: Arc<Mutex<Db>>
+    db: Arc<Mutex<Db>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let db = db.lock().await;
     db.clear().unwrap();

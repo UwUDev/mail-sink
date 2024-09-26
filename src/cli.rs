@@ -28,6 +28,14 @@ pub struct Args {
         help = "The key to access the API"
     )]
     pub key: String,
+
+    #[arg(
+        short,
+        long,
+        help = "The lifetime of an email in the database in minutes",
+        value_name = "LIFETIME IN MINUTES"
+    )]
+    pub lifetime: Option<u16>,
 }
 
 pub static INTRO: &str = "

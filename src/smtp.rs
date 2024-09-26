@@ -35,7 +35,10 @@ impl Mail {
             from,
             to,
             data,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
         }
     }
 }
