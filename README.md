@@ -1,6 +1,6 @@
 # Mail Sink
 
-An ultra lightweight mail sink supporting TLS with HTTP API and embedded database. Mostly used to massively verify email addresses on some site or for account generation.
+An ultra lightweight mail sink supporting TLS with HTTP API, embedded database and a panel. Mostly used to massively verify email addresses on some site or for account generation.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -22,6 +22,8 @@ Mail Sink is a simple mail server that accepts any incoming email and stores it 
 - HTTP API for retrieval and deletion of stored emails.
 - TLS support.
 - Embedded database.
+- Useful panel
+- Mails preview
 - Really low memory and CPU usage.
 
 ## Installation
