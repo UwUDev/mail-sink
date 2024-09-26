@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::BufReader as StdBufReader;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
@@ -17,6 +18,7 @@ pub struct Mail {
     pub from: HashSet<String>,
     pub to: HashSet<String>,
     pub data: String,
+    pub timestamp: u128,
 }
 
 impl Mail {
@@ -26,6 +28,15 @@ impl Mail {
             body = body.split_off(index + 4);
         }
         body
+    }
+
+    pub fn new(from: HashSet<String>, to: HashSet<String>, data: String) -> Self {
+        Self {
+            from,
+            to,
+            data,
+            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
+        }
     }
 }
 pub(crate) async fn handle_client(
@@ -124,11 +135,7 @@ pub(crate) async fn handle_client(
         }
     }
 
-    Ok(Mail {
-        from,
-        to,
-        data: body,
-    })
+    Ok(Mail::new(from, to, body))
 }
 
 async fn handle_tls_client(
@@ -195,11 +202,7 @@ async fn handle_tls_client(
         }
     }
 
-    Ok(Mail {
-        from,
-        to,
-        data: body,
-    })
+    Ok(Mail::new(from, to, body))
 }
 
 pub fn load_tls_config() -> Result<ServerConfig, Box<dyn Error + Send + Sync>> {
