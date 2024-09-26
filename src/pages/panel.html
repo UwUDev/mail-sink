@@ -169,6 +169,16 @@
             font-size: 18px;
             margin-left: 10px;
         }
+
+        #delete-all-button {
+            background-color: #ff6b6b;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: fit-content;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -184,6 +194,8 @@
 </section>
 <section id="mails">
     <h2>Mails</h2>
+    <!-- The delete all button -->
+    <div id="delete-all-button" onclick="deleteAllMails()">Purge all mails</div>
     <table>
         <thead>
         <tr>
@@ -216,12 +228,12 @@
 </section>
 
 <script>
-    const apiKey = 'prouteur';
-    const apiBaseUrl = 'http://localhost:8080';
+    const apiKey = new URLSearchParams(window.location.search).get('k');
+    const apiBaseUrl = document.location.origin;
     let limit = 10;
     let offset = 0;
 
-    // Fetch AND display stats
+    // fetch AND display stats
     function fetchStats() {
         fetch(`${apiBaseUrl}/info?k=${apiKey}`)
             .then(response => response.json())
@@ -464,6 +476,26 @@
                 }
             })
             .catch(error => console.error('Error deleting mail:', error));
+    }
+
+    function deleteAllMails() {
+        if (!confirm('Are you sure you want to delete all mails?')) {
+            return;
+        }
+
+        fetch(`${apiBaseUrl}/mails?k=${apiKey}`, {
+            method: 'DELETE'
+        })
+            .then(response => {
+                if (response.ok) {
+                    fetchMails();
+                } else {
+                    console.error('Failed to delete all mails');
+                }
+            })
+            .catch(error => console.error('Error deleting all mails:', error));
+
+        document.location.reload();
     }
 
     // pagination controls
