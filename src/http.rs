@@ -164,8 +164,12 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             "/info".to_string(),
             Box::new(|_, writer, db| Box::pin(info_handler(writer, db))),
         ),
+        (
+            Method::GET,
+            "/preview/:mail_id".to_string(),
+            Box::new(|request, writer, db| Box::pin(preview_mail_handler(request, writer, db))),
+        ),
         // TODO: Add more routes here:
-        //    - GET /preview/<mail_id>  (visual preview of the email)
         //    - GET /panel              (admin panel to view all emails and delete them)
     ]
 }
@@ -379,6 +383,59 @@ async fn info_handler(
     writer.write_all(b"\r\n").await?;
 
     writer.write_all(json.as_bytes()).await?;
+
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn preview_mail_handler(
+    request: Request,
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let mail_id = request.params.get("mail_id").unwrap();
+
+    let db = db.lock().await;
+    let result = db.get(mail_id.as_bytes());
+
+    let mut writer = writer.lock().await;
+
+    if let Ok(Some(data)) = result {
+        let mail: Mail = bincode::deserialize(&data)?;
+        let html_body = mail.parse_body();
+
+        let html = format!(
+            r#"
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Mail Preview</title>
+            </head>
+            <body>
+                <h1>From: {}</h1>
+                <h2>To: {}</h2>
+                <html>
+                    {}
+                </html>
+            </body>
+            </html>
+            "#,
+            mail.from.iter().next().unwrap(),
+            mail.to.iter().next().unwrap(),
+            html_body
+        );
+
+        writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+        writer.write_all(b"Content-Type: text/html\r\n").await?;
+        writer
+            .write_all(format!("Content-Length: {}\r\n", html.len()).as_bytes())
+            .await?;
+        writer.write_all(b"\r\n").await?;
+
+        writer.write_all(html.as_bytes()).await?;
+    } else {
+        writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
+    }
 
     writer.flush().await?;
     Ok(())
