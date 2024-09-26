@@ -6,9 +6,9 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use sysinfo::{Disks, System};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
-use sysinfo::System;
 
 use tokio::sync::{Mutex as AsyncMutex, Mutex};
 
@@ -170,8 +170,11 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             "/preview/:mail_id".to_string(),
             Box::new(|request, writer, db| Box::pin(preview_mail_handler(request, writer, db))),
         ),
-        // TODO: Add more routes here:
-        //    - GET /panel              (admin panel to view all emails and delete them)
+        (
+            Method::GET,
+            "/panel".to_string(),
+            Box::new(|_, writer, _| Box::pin(panel_handler(writer))),
+        ),
     ]
 }
 
@@ -355,29 +358,47 @@ async fn info_handler(
     let db = db.lock().await;
     let count = db.len();
 
-    let disk_usage = db.size_on_disk().unwrap();
+    let database_disk_usage = db.size_on_disk().unwrap();
     let pid = std::process::id();
     let mut process = Process::new(pid).unwrap();
 
     let mem_info = process.memory_info().unwrap();
     let mem_usage = mem_info.rss();
 
-    let system = System::new();
+    let mut system = System::new();
+    system.refresh_memory();
+    system.refresh_cpu_usage();
+
     let machine_memory_usage = system.used_memory();
     let machine_memory_total = system.total_memory();
 
+    // this is a bit tricky, but it's needed to get the correct CPU usage because
+    // refresh_cpu_usage() consumes lots of CPU for a really short time
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     let cpu_usage = process.cpu_percent().unwrap();
 
     let machine_cpu_usage = system.global_cpu_usage();
 
+    let max_cpu_usage = num_cpus::get() as f32 * 100.0;
+
+    let disks = Disks::new_with_refreshed_list();
+    let disk_usage: u64 = disks
+        .iter()
+        .map(|disk| disk.total_space() - disk.available_space())
+        .sum();
+    let free_space: u64 = disks.iter().map(|disk| disk.available_space()).sum();
+
     let json = json!({
         "mail_count": count,
-        "disk_usage": disk_usage,
+        "database_disk_usage": database_disk_usage,
         "memory_usage": mem_usage,
         "machine_memory_usage": machine_memory_usage,
         "machine_memory_total": machine_memory_total,
         "cpu_usage": cpu_usage,
         "machine_cpu_usage": machine_cpu_usage,
+        "max_cpu_usage": max_cpu_usage,
+        "disk_usage": disk_usage,
+        "free_space": free_space,
     });
 
     let json = serde_json::to_string(&json)?;
@@ -447,6 +468,24 @@ async fn preview_mail_handler(
         writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
     }
 
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn panel_handler(
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let body = include_bytes!("pages/panel.html");
+
+    let mut writer = writer.lock().await;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer.write_all(b"Content-Type: text/html\r\n").await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", body.len()).as_bytes())
+        .await?;
+
+    writer.write_all(b"\r\n").await?;
+    writer.write_all(body).await?;
     writer.flush().await?;
     Ok(())
 }

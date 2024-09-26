@@ -73,6 +73,8 @@ async fn main() -> Result<(), SharedError> {
         }
     }
 
+    eprintln!("All services have completed unexpectedly ...");
+
     Ok(())
 }
 

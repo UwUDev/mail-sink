@@ -21,6 +21,7 @@ clap = { version = "4.5.18", features = ["derive"] }
 colored = "2.1.0"
 psutil = "3.3.0"
 sysinfo = "0.31.4"
+num_cpus = "1.16.0"
 
 [profile.release]
 opt-level = "z"

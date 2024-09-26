@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mail Sink Dashboard</title>
+    <style>
+        /* Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Dark Theme */
+        body {
+            background-color: #1e1e1e;
+            color: #c9d1d9;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2em;
+        }
+
+        /* Stats Section */
+        #stats {
+            margin-bottom: 30px;
+        }
+
+        #stats h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Stats Bars */
+        .stat-group {
+            margin-bottom: 20px;
+        }
+
+        .stat-label {
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .stat-bar {
+            position: relative;
+            width: 100%;
+            height: 25px;
+            background-color: #333;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .bar-segment {
+            height: 100%;
+            float: left;
+        }
+
+        .bar-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.9em;
+        }
+
+        .bar-labels div {
+            display: flex;
+            align-items: center;
+        }
+
+        .color-box {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+
+        /* Colors */
+        .color-program {
+            background-color: #ff6b6b;
+        }
+
+        .color-machine {
+            background-color: #f7b731;
+        }
+
+        .color-free {
+            background-color: #20bf6b;
+        }
+
+        .color-database {
+            background-color: #4b7bec;
+        }
+
+        /* Mail Count */
+        #mail-count {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+
+        /* Mail Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        thead {
+            background-color: #2d2d2d;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #3c3c3c;
+            text-align: left;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+
+        tbody tr:hover {
+            background-color: #333;
+        }
+
+        /* Buttons */
+        .button {
+            background: none;
+            border: none;
+            color: #c9d1d9;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .button:hover {
+            color: #58a6ff;
+        }
+
+        /* Pagination */
+        #pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #pagination .controls {
+            display: flex;
+            align-items: center;
+        }
+
+        #pagination select {
+            margin-left: 10px;
+            padding: 5px;
+            background-color: #2d2d2d;
+            color: #c9d1d9;
+            border: 1px solid #444;
+        }
+
+        /* Icons */
+        .icon {
+            font-size: 18px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Mail Sink Dashboard</h1>
+</header>
+<section id="stats">
+    <h2>System Statistics</h2>
+    <div id="mail-count"></div>
+    <div class="stat-group" id="memory-stat"></div>
+    <div class="stat-group" id="cpu-stat"></div>
+    <div class="stat-group" id="disk-stat"></div>
+</section>
+<section id="mails">
+    <h2>Mails</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>To</th>
+            <th>From</th>
+            <th>Body</th>
+            <th>Date</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="mail-table-body">
+            <!-- mails rows will be inserted here -->
+        </tbody>
+    </table>
+    <div id="pagination">
+        <div class="controls">
+            <button id="prev-button" class="button">&lt;</button>
+            <button id="next-button" class="button">&gt;</button>
+        </div>
+        <div>
+            <label for="limit-select">Items per page:</label>
+            <select id="limit-select">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+</section>
+
+<script>
+    const apiKey = 'prouteur';
+    const apiBaseUrl = 'http://localhost:8080';
+    let limit = 10;
+    let offset = 0;
+
+    // Fetch AND display stats
+    function fetchStats() {
+        fetch(`${apiBaseUrl}/info?k=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                displayMailCount(data.mail_count);
+                displayMemoryStat(data);
+                displayCPUStat(data);
+                displayDiskStat(data);
+            })
+            .catch(error => console.error('Error fetching stats:', error));
+    }
+
+    function displayMailCount(mailCount) {
+        const mailCountDiv = document.getElementById('mail-count');
+        mailCountDiv.textContent = `Total Mails: ${mailCount}`;
+    }
+
+    function displayMemoryStat(data) {
+        const memoryStatDiv = document.getElementById('memory-stat');
+        memoryStatDiv.innerHTML = '';
+
+        const totalMemory = data.machine_memory_total || (data.memory_usage * 2);
+        const programUsage = data.memory_usage;
+        const machineUsage = data.machine_memory_usage;
+        const availableMemory = totalMemory - machineUsage;
+
+        const programPercent = (programUsage / totalMemory) * 100;
+        const machinePercent = ((machineUsage - programUsage) / totalMemory) * 100;
+        const availablePercent = (availableMemory / totalMemory) * 100;
+
+        const formattedProgramUsage = formatBytes(programUsage);
+        const formattedMachineUsage = formatBytes(machineUsage - programUsage);
+        const formattedAvailableMemory = formatBytes(availableMemory);
+
+        const bar = createStatBar([
+            {percent: programPercent, colorClass: 'color-program'},
+            {percent: machinePercent, colorClass: 'color-machine'},
+            {percent: availablePercent, colorClass: 'color-free'}
+        ]);
+
+        const labels = createBarLabels([
+            {colorClass: 'color-program', label: `Program: ${formattedProgramUsage}`},
+            {colorClass: 'color-machine', label: `Other Usage: ${formattedMachineUsage}`},
+            {colorClass: 'color-free', label: `Available: ${formattedAvailableMemory}`}
+        ]);
+
+        const label = document.createElement('div');
+        label.classList.add('stat-label');
+        label.textContent = 'Memory Usage';
+
+        memoryStatDiv.appendChild(label);
+        memoryStatDiv.appendChild(bar);
+        memoryStatDiv.appendChild(labels);
+    }
+
+    function displayCPUStat(data) {
+        const cpuStatDiv = document.getElementById('cpu-stat');
+        cpuStatDiv.innerHTML = '';
+
+        const totalCPU = data.max_cpu_usage;
+        const coreCount = totalCPU / 100;
+        const programCPUUsage = data.cpu_usage;
+        const machineCPUUsage = data.machine_cpu_usage * coreCount;
+        const availableCPU = totalCPU - machineCPUUsage;
+
+        const programPercent = (programCPUUsage / totalCPU) * 100;
+        const machinePercent = (machineCPUUsage / totalCPU) * 100;
+        const availablePercent = 100 - programPercent - machinePercent;
+
+        const formattedProgramCPU = programCPUUsage.toFixed(2) + '%';
+        const formattedMachineCPU = (machineCPUUsage).toFixed(2) + '%';
+        const formattedAvailableCPU = availableCPU.toFixed(2) + '%';
+
+        const bar = createStatBar([
+            {percent: programPercent, colorClass: 'color-program'},
+            {percent: machinePercent, colorClass: 'color-machine'},
+            {percent: availablePercent, colorClass: 'color-free'}
+        ]);
+
+        const labels = createBarLabels([
+            {colorClass: 'color-program', label: `Program: ${formattedProgramCPU}`},
+            {colorClass: 'color-machine', label: `Other Usage: ${formattedMachineCPU}`},
+            {colorClass: 'color-free', label: `Available: ${formattedAvailableCPU}`}
+        ]);
+
+        const label = document.createElement('div');
+        label.classList.add('stat-label');
+        label.textContent = 'CPU Usage';
+
+        cpuStatDiv.appendChild(label);
+        cpuStatDiv.appendChild(bar);
+        cpuStatDiv.appendChild(labels);
+    }
+
+    function displayDiskStat(data) {
+        const diskStatDiv = document.getElementById('disk-stat');
+        diskStatDiv.innerHTML = '';
+
+        const totalDisk = data.disk_usage + data.free_space;
+        const databaseUsage = data.database_disk_usage;
+        const otherDiskUsage = data.disk_usage - databaseUsage;
+        const availableDisk = data.free_space;
+
+        const databasePercent = (databaseUsage / totalDisk) * 100;
+        const otherPercent = (otherDiskUsage / totalDisk) * 100;
+        const availablePercent = (availableDisk / totalDisk) * 100;
+
+        const formattedDatabaseUsage = formatBytes(databaseUsage);
+        const formattedOtherUsage = formatBytes(otherDiskUsage);
+        const formattedAvailableDisk = formatBytes(availableDisk);
+
+        const bar = createStatBar([
+            {percent: databasePercent, colorClass: 'color-database'},
+            {percent: otherPercent, colorClass: 'color-machine'},
+            {percent: availablePercent, colorClass: 'color-free'}
+        ]);
+
+        const labels = createBarLabels([
+            {colorClass: 'color-database', label: `Database: ${formattedDatabaseUsage}`},
+            {colorClass: 'color-machine', label: `Other Usage: ${formattedOtherUsage}`},
+            {colorClass: 'color-free', label: `Available: ${formattedAvailableDisk}`}
+        ]);
+
+        const label = document.createElement('div');
+        label.classList.add('stat-label');
+        label.textContent = 'Disk Usage';
+
+        diskStatDiv.appendChild(label);
+        diskStatDiv.appendChild(bar);
+        diskStatDiv.appendChild(labels);
+    }
+
+    function createStatBar(segments) {
+        const bar = document.createElement('div');
+        bar.classList.add('stat-bar');
+
+        segments.forEach(segment => {
+            const segmentDiv = document.createElement('div');
+            segmentDiv.classList.add('bar-segment', segment.colorClass);
+            segmentDiv.style.width = `${segment.percent}%`;
+            bar.appendChild(segmentDiv);
+        });
+
+        return bar;
+    }
+
+    function createBarLabels(labelsData) {
+        const labelsDiv = document.createElement('div');
+        labelsDiv.classList.add('bar-labels');
+
+        labelsData.forEach(data => {
+            const labelDiv = document.createElement('div');
+            const colorBox = document.createElement('span');
+            colorBox.classList.add('color-box', data.colorClass);
+            labelDiv.appendChild(colorBox);
+            labelDiv.appendChild(document.createTextNode(data.label));
+            labelsDiv.appendChild(labelDiv);
+        });
+
+        return labelsDiv;
+    }
+
+    // format bytes into a human-readable string (I've totally stolen this function)
+    function formatBytes(bytes) {
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 Bytes';
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // fetch AND display mails
+    function fetchMails() {
+        fetch(`${apiBaseUrl}/mails?limit=${limit}&offset=${offset}&k=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById('mail-table-body');
+                tbody.innerHTML = '';
+                data.forEach((mail) => {
+                    const tr = document.createElement('tr');
+
+                    const tdTo = document.createElement('td');
+                    tdTo.textContent = mail.to.join(', ');
+                    tr.appendChild(tdTo);
+
+                    const tdFrom = document.createElement('td');
+                    tdFrom.textContent = mail.from.join(', ');
+                    tr.appendChild(tdFrom);
+
+                    const tdBody = document.createElement('td');
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(mail.body, 'text/html');
+                    let bodyText = doc.body.textContent || "";
+                    bodyText = bodyText.replace(/\n/g, ' ').trim();
+                    if (bodyText.length > 50) {
+                        bodyText = bodyText.substring(0, 47) + '...';
+                    }
+                    tdBody.textContent = bodyText;
+                    tr.appendChild(tdBody);
+
+                    const tdDate = document.createElement('td');
+                    const date = new Date(mail.timestamp);
+                    tdDate.textContent = date.toLocaleString();
+                    tr.appendChild(tdDate);
+
+                    const tdActions = document.createElement('td');
+
+                    const previewBtn = document.createElement('button');
+                    previewBtn.classList.add('button');
+                    previewBtn.innerHTML = '👁'; // Eye icon
+                    previewBtn.addEventListener('click', () => {
+                        window.open(`${apiBaseUrl}/preview/${encodeURIComponent(mail.to[0])}?k=${apiKey}`, '_blank');
+                    });
+                    tdActions.appendChild(previewBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.classList.add('button');
+                    deleteBtn.innerHTML = '🗑';
+                    deleteBtn.addEventListener('click', () => {
+                        deleteMail(mail.to[0]);
+                    });
+                    tdActions.appendChild(deleteBtn);
+
+                    tr.appendChild(tdActions);
+
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(error => console.error('Error fetching mails:', error));
+    }
+
+    function deleteMail(mailTo) {
+        fetch(`${apiBaseUrl}/mails/${encodeURIComponent(mailTo)}?k=${apiKey}`, {
+            method: 'DELETE'
+        })
+            .then(response => {
+                if (response.ok) {
+                    fetchMails();
+                } else {
+                    console.error('Failed to delete mail');
+                }
+            })
+            .catch(error => console.error('Error deleting mail:', error));
+    }
+
+    // pagination controls
+    document.getElementById('prev-button').addEventListener('click', () => {
+        if (offset >= limit) {
+            offset -= limit;
+            fetchMails();
+        }
+    });
+
+    document.getElementById('next-button').addEventListener('click', () => {
+        offset += limit;
+        fetchMails();
+    });
+
+    document.getElementById('limit-select').addEventListener('change', (event) => {
+        limit = parseInt(event.target.value);
+        offset = 0;
+        fetchMails();
+    });
+
+    // auto-refresh stats every 5 seconds
+    setInterval(fetchStats, 5000);
+
+    // initial fetch
+    fetchStats();
+    fetchMails();
+</script>
+</body>
+</html>
