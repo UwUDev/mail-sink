@@ -812,6 +812,7 @@ dependencies = [
  "colored",
  "futures",
  "num_cpus",
+ "percent-encoding",
  "psutil",
  "rustls 0.23.13",
  "rustls-pemfile",

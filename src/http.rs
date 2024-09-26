@@ -94,6 +94,9 @@ pub(crate) async fn handle_client(
         // parse the URL to handle path and query parameters
         let url = Url::parse(&format!("http://localhost{}", path_and_query))?;
         let path = url.path().to_string();
+
+        //url decode the path
+        let path = percent_encoding::percent_decode_str(&path).decode_utf8().unwrap().to_string();
         let query_pairs = form_urlencoded::parse(url.query().unwrap_or("").as_bytes())
             .into_owned()
             .collect::<HashMap<String, String>>();
