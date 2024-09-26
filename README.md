@@ -9,6 +9,8 @@ An ultra lightweight mail sink supporting TLS with HTTP API and embedded databas
 - [Building](#building)
 - [Usage](#usage)
   - [Options](#options)
+- [Panel](#panel)
+- [Open mail](#open-mail)
 - [API Access](#api-access)
 - [Notes](#notes)
 
@@ -65,6 +67,15 @@ Run Mail Sink with specific options:
 |       | --http-port            | HTTP PORT | Set the HTTP port. Default: `8080`                  |
 | -k    | --key                  | KEY       | The key to access the API. Default: `prouteur`      |
 | -V    | --version              |           | Print version.                                      |
+
+## Panel
+The panel is accessible via `/panel?k=your_key`
+
+![image](https://github.com/user-attachments/assets/9163df15-ccc7-4425-a3c9-625be5579114)
+
+## Open mail
+
+Mails can be openned via panel *(by clicking the 👁)* or by opening `/preview/some.mail@test.com?k=your_key`
 
 ## API Access
 
