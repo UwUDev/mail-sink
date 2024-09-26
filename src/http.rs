@@ -8,6 +8,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
+use sysinfo::System;
 
 use tokio::sync::{Mutex as AsyncMutex, Mutex};
 
@@ -361,13 +362,22 @@ async fn info_handler(
     let mem_info = process.memory_info().unwrap();
     let mem_usage = mem_info.rss();
 
+    let system = System::new();
+    let machine_memory_usage = system.used_memory();
+    let machine_memory_total = system.total_memory();
+
     let cpu_usage = process.cpu_percent().unwrap();
+
+    let machine_cpu_usage = system.global_cpu_usage();
 
     let json = json!({
         "mail_count": count,
         "disk_usage": disk_usage,
         "memory_usage": mem_usage,
+        "machine_memory_usage": machine_memory_usage,
+        "machine_memory_total": machine_memory_total,
         "cpu_usage": cpu_usage,
+        "machine_cpu_usage": machine_cpu_usage,
     });
 
     let json = serde_json::to_string(&json)?;
