@@ -40,9 +40,10 @@ async fn main() -> Result<(), SharedError> {
         );
 
     let db_clone = db.clone();
+    let key = args.key.clone();
     let service_handle =
         task::spawn(
-            async move { run_http_service(db_clone, args.http_port, args.key.clone()).await },
+            async move { run_http_service(db_clone, args.http_port, key.clone()).await },
         );
 
     let secondary_smtp_handle = if let Some(port) = args.secondary_smtp_port {
@@ -62,6 +63,9 @@ async fn main() -> Result<(), SharedError> {
         }
         _ => {}
     }
+
+
+    println!("Panel: http://localhost:{}/panel?k={}", args.http_port, args.key);
 
     // wait for all services to complete (it should never happen)
     match secondary_smtp_handle {
