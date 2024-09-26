@@ -1,4 +1,5 @@
-use serde_json::Value;
+use psutil::process::Process;
+use serde_json::{json, Value};
 use sled::Db;
 use std::collections::HashMap;
 use std::error::Error;
@@ -158,10 +159,14 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             "/mails".to_string(),
             Box::new(|_, writer, db| Box::pin(delete_mails_handler(writer, db))),
         ),
+        (
+            Method::GET,
+            "/info".to_string(),
+            Box::new(|_, writer, db| Box::pin(info_handler(writer, db))),
+        ),
         // TODO: Add more routes here:
         //    - GET /preview/<mail_id>  (visual preview of the email)
         //    - GET /panel              (admin panel to view all emails and delete them)
-        //    - POST /info              (basic info about the server, mail count, etc.)
     ]
 }
 
@@ -334,6 +339,47 @@ async fn delete_mails_handler(
 
     let mut writer = writer.lock().await;
     writer.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn info_handler(
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let db = db.lock().await;
+    let count = db.len();
+
+    let disk_usage = db.size_on_disk().unwrap();
+    let pid = std::process::id();
+    let mut process = Process::new(pid).unwrap();
+
+    let mem_info = process.memory_info().unwrap();
+    let mem_usage = mem_info.rss();
+
+    let cpu_usage = process.cpu_percent().unwrap();
+
+    let json = json!({
+        "mail_count": count,
+        "disk_usage": disk_usage,
+        "memory_usage": mem_usage,
+        "cpu_usage": cpu_usage,
+    });
+
+    let json = serde_json::to_string(&json)?;
+
+    let mut writer = writer.lock().await;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer
+        .write_all(b"Content-Type: application/json\r\n")
+        .await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+        .await?;
+    writer.write_all(b"\r\n").await?;
+
+    writer.write_all(json.as_bytes()).await?;
+
     writer.flush().await?;
     Ok(())
 }
