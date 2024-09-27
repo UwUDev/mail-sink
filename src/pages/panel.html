@@ -423,13 +423,34 @@
                     tr.appendChild(tdFrom);
 
                     const tdBody = document.createElement('td');
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(mail.body, 'text/html');
-                    let bodyText = doc.body.textContent || "";
+
+                    let bodyText;
+
+                    if (isHTML(mail.body)) {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(mail.body, 'text/html');
+
+                        // remove all <style> elements from the document
+                        const styleElements = doc.getElementsByTagName('style');
+                        for (let i = styleElements.length - 1; i >= 0; i--) {
+                            styleElements[i].parentNode.removeChild(styleElements[i]);
+                        }
+
+                        // get the content of the <body> if present, otherwise get the content of the <html>
+                        bodyText = doc.body ? doc.body.textContent : doc.documentElement.textContent || "";
+                    } else {
+                        // no html detected
+                        bodyText = mail.body;
+                    }
+
+
                     bodyText = bodyText.replace(/\n/g, ' ').trim();
+
+                    // limit the text to 50 characters
                     if (bodyText.length > 50) {
                         bodyText = bodyText.substring(0, 47) + '...';
                     }
+
                     tdBody.textContent = bodyText;
                     tr.appendChild(tdBody);
 
@@ -496,6 +517,12 @@
             .catch(error => console.error('Error deleting all mails:', error));
 
         document.location.reload();
+    }
+
+    function isHTML(str) {
+        const doc = new DOMParser().parseFromString(str, 'text/html');
+        // check if the parsing resulted in any HTML elements
+        return Array.from(doc.body.childNodes).some(node => node.nodeType === 1);
     }
 
     // pagination controls
