@@ -23,6 +23,7 @@ psutil = "3.3.0"
 sysinfo = "0.31.4"
 num_cpus = "1.16.0"
 percent-encoding = "2.3.1"
+mailparse = "0.13"
 
 [profile.release]
 opt-level = "z"

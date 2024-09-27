@@ -1,4 +1,5 @@
 use crate::SharedError;
+use mailparse::parse_mail;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -23,11 +24,37 @@ pub struct Mail {
 
 impl Mail {
     pub fn parse_body(&self) -> String {
-        let mut body = self.data.clone();
-        if let Some(index) = body.find("\r\n\r\n") {
-            body = body.split_off(index + 4);
+        let mail = match parse_mail(self.data.as_bytes()) {
+            Ok(parsed) => parsed,
+            // return raw body if parsing fails
+            Err(_) => {
+                let mut body = self.data.clone();
+                // after the headers
+                if let Some(index) = body.find("\r\n\r\n") {
+                    body = body[index + 4..].to_string();
+                }
+                return body;
+            }
+        };
+
+        // check if the email is multipart
+        if mail.subparts.is_empty() {
+            // not multipart, return the body as is
+            mail.get_body().unwrap_or_else(|_| String::new())
+        } else {
+            // prioritize 'text/html' parts
+            for part in &mail.subparts {
+                let content_type = part.ctype.mimetype.to_lowercase();
+                if content_type == "text/html" {
+                    // Return the HTML part's body
+                    return part.get_body().unwrap_or_else(|_| String::new());
+                }
+            }
+            // no 'text/html' part found, return the first multipart's body
+            mail.subparts[0]
+                .get_body()
+                .unwrap_or_else(|_| String::new())
         }
-        body
     }
 
     pub fn new(from: HashSet<String>, to: HashSet<String>, data: String) -> Self {
