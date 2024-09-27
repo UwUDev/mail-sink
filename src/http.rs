@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::Arc;
 use sysinfo::{Disks, System};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
@@ -232,8 +233,15 @@ async fn get_mail_handler(
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mail_id = request.params.get("mail_id").unwrap();
 
+    let mail_id = u128::from_str_radix(mail_id, 10).map_err(|_| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid mail_id",
+        )) as Box<dyn Error + Send + Sync>
+    })?;
+
     let db = db.lock().await;
-    let result = db.get(mail_id.as_bytes());
+    let result = db.get(mail_id.to_le_bytes());
 
     let mut writer = writer.lock().await;
 
@@ -241,6 +249,7 @@ async fn get_mail_handler(
         let mail: Mail = bincode::deserialize(&data)?;
         let mut json = serde_json::to_value(&mail)?;
         json["body"] = Value::String(mail.parse_body());
+        Value::Number(serde_json::Number::from_str(&mail.timestamp().to_string()).unwrap());
         let json = serde_json::to_string(&json)?;
 
         writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
@@ -266,13 +275,20 @@ async fn delete_mail_handler(
     db: Arc<Mutex<Db>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mail_id = request.params.get("mail_id").unwrap();
+    let mail_id = u128::from_str_radix(mail_id, 10).map_err(|_| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid mail_id",
+        )) as Box<dyn Error + Send + Sync>
+    })?;
 
     let db = db.lock().await;
-    let result = db.remove(mail_id.as_bytes());
+    let result = db.get(mail_id.to_le_bytes());
 
     let mut writer = writer.lock().await;
 
     if result.is_ok() {
+        db.remove(mail_id.to_le_bytes()).unwrap();
         writer.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await?;
     } else {
         writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
@@ -325,6 +341,7 @@ async fn get_mails_handler(
         let mut json: Value = serde_json::to_value(mail)?;
         let parsed_body = mail.parse_body();
         json["body"] = Value::String(parsed_body);
+        json["timestamp"] = Value::Number(serde_json::Number::from_str(&mail.timestamp().to_string()).unwrap());
         mails_json.push(json);
     }
     let json = serde_json::to_string(&mails_json)?;
@@ -431,9 +448,15 @@ async fn preview_mail_handler(
     db: Arc<Mutex<Db>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mail_id = request.params.get("mail_id").unwrap();
+    let mail_id = u128::from_str_radix(mail_id, 10).map_err(|_| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid mail_id",
+        )) as Box<dyn Error + Send + Sync>
+    })?;
 
     let db = db.lock().await;
-    let result = db.get(mail_id.as_bytes());
+    let result = db.get(mail_id.to_le_bytes());
 
     let mut writer = writer.lock().await;
 

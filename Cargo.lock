@@ -842,6 +842,7 @@ dependencies = [
  "clap-help",
  "colored",
  "futures",
+ "lazy_static",
  "mailparse",
  "num_cpus",
  "percent-encoding",

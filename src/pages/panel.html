@@ -465,7 +465,7 @@
                     previewBtn.classList.add('button');
                     previewBtn.innerHTML = '👁'; // Eye icon
                     previewBtn.addEventListener('click', () => {
-                        window.open(`${apiBaseUrl}/preview/${encodeURIComponent(mail.to[0])}?k=${apiKey}`, '_blank');
+                        window.open(`${apiBaseUrl}/preview/${encodeURIComponent(mail.id)}?k=${apiKey}`, '_blank');
                     });
                     tdActions.appendChild(previewBtn);
 
@@ -473,7 +473,7 @@
                     deleteBtn.classList.add('button');
                     deleteBtn.innerHTML = '🗑';
                     deleteBtn.addEventListener('click', () => {
-                        deleteMail(mail.to[0]);
+                        deleteMail(mail.id);
                     });
                     tdActions.appendChild(deleteBtn);
 

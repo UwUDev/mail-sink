@@ -1,6 +1,7 @@
 mod cli;
 mod http;
 mod smtp;
+mod snowflake;
 
 use crate::cli::*;
 use clap::{CommandFactory, Parser};
@@ -108,8 +109,7 @@ async fn run_smtp_service(
                     if mail.from.len() > 0 && mail.to.len() > 0 && mail.data.len() > 20 {
                         let db = db.lock().await;
                         let bytes = bincode::serialize(&mail).unwrap();
-                        let to = mail.to.iter().next().unwrap().to_owned();
-                        db.insert(to, bytes).unwrap();
+                        db.insert(mail.id.to_le_bytes(), bytes).unwrap();
                     }
                 }
                 Err(e) => {
@@ -166,7 +166,7 @@ async fn run_cleaner_service(
                 .unwrap()
                 .as_millis();
 
-            if current_millis - mail.timestamp > (lifetime as u128 * 60 * 1000) {
+            if current_millis - mail.timestamp() > (lifetime as u128 * 60 * 1000) {
                 db.remove(&key).unwrap();
                 count += 1;
             }

@@ -8,7 +8,6 @@ use std::fs::File;
 use std::io::BufReader as StdBufReader;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
@@ -19,7 +18,7 @@ pub struct Mail {
     pub from: HashSet<String>,
     pub to: HashSet<String>,
     pub data: String,
-    pub timestamp: u128,
+    pub id: u128,
 }
 
 impl Mail {
@@ -57,15 +56,16 @@ impl Mail {
         }
     }
 
+    pub fn timestamp(&self) -> u128 {
+        crate::snowflake::to_timestamp(self.id)
+    }
+
     pub fn new(from: HashSet<String>, to: HashSet<String>, data: String) -> Self {
         Self {
             from,
             to,
             data,
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis(),
+            id: crate::snowflake::next(),
         }
     }
 }
