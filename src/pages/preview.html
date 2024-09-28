@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Preview</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #c9d1d9;
+        }
+
+        .container {
+            background-color: #282626;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .header p {
+            margin: 5px 0;
+            color: #8b949e;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 20px;
+            background-color: #4b7bec;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #3867d6;
+        }
+
+        .content {
+            display: none;
+        }
+
+        .content.active {
+            display: block;
+        }
+
+        .raw-text {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 id="email-subject">Loading...</h1>
+        <p id="email-from">From: </p>
+        <p id="email-to">To: </p>
+    </div>
+    <center>
+        <div id="body-preview" class="content raw-text"></div>
+    </center>
+    <div id="data-preview" class="content">
+        <pre id="raw-data"></pre>
+    </div>
+
+    <a id="toggle-button" class="button">Switch to raw data</a>
+</div>
+
+<script>
+    function parseQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            mailId: window.location.pathname.split('/')[2],
+            key: params.get('k')
+        };
+    }
+
+    async function fetchMailData(mailId, key) {
+        const response = await fetch(`/mails/${mailId}?k=${key}`);
+        return response.json();
+    }
+
+    function displayMailData(mail) {
+        document.getElementById('email-subject').innerText = mail.subject;
+        document.getElementById('email-from').innerText = `From: ${mail.from.join(', ')}`;
+        document.getElementById('email-to').innerText = `To: ${mail.to.join(', ')}`;
+
+        const bodyPreview = document.getElementById('body-preview');
+        if (mail.body.startsWith('<')) {
+            bodyPreview.innerHTML = mail.body;
+        } else {
+            bodyPreview.innerText = mail.body;
+        }
+        document.getElementById('raw-data').innerText = mail.data;
+        bodyPreview.classList.add('active');
+    }
+
+    function toggleView() {
+        const bodyPreview = document.getElementById('body-preview');
+        const dataPreview = document.getElementById('data-preview');
+        const toggleButton = document.getElementById('toggle-button');
+
+        if (bodyPreview.classList.contains('active')) {
+            bodyPreview.classList.remove('active');
+            dataPreview.classList.add('active');
+            toggleButton.innerText = 'Switch to body preview';
+        } else {
+            bodyPreview.classList.add('active');
+            dataPreview.classList.remove('active');
+            toggleButton.innerText = 'Switch to raw data';
+        }
+    }
+
+    document.getElementById('toggle-button').addEventListener('click', toggleView);
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const {mailId, key} = parseQueryParams();
+        const mail = await fetchMailData(mailId, key);
+        displayMailData(mail);
+    });
+</script>
+</body>
+</html>

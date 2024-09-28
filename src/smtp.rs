@@ -1,5 +1,6 @@
 pub(crate) mod mail;
 
+use crate::smtp::mail::{get_data_from_to, get_subject, Mail};
 use crate::SharedError;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use std::collections::HashSet;
@@ -12,8 +13,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
-use crate::smtp::mail::{get_data_from_to, get_subject, Mail};
-
 
 pub(crate) async fn handle_client(
     stream: TcpStream,
@@ -72,10 +71,24 @@ pub(crate) async fn handle_client(
             }
             break;
         } else if command_upper.starts_with("MAIL FROM") {
-            from.insert(command[10..].to_string().replace("<", "").replace(">", "").trim().to_string());
+            from.insert(
+                command[10..]
+                    .to_string()
+                    .replace("<", "")
+                    .replace(">", "")
+                    .trim()
+                    .to_string(),
+            );
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper.starts_with("RCPT TO") {
-            to.insert(command[8..].to_string().replace("<", "").replace(">", "").trim().to_string());
+            to.insert(
+                command[8..]
+                    .to_string()
+                    .replace("<", "")
+                    .replace(">", "")
+                    .trim()
+                    .to_string(),
+            );
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper == "DATA" {
             writer

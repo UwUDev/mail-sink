@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use mailparse::parse_mail;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct Mail {
@@ -50,7 +50,12 @@ impl Mail {
         crate::snowflake::to_timestamp(self.id)
     }
 
-    pub fn new(from: HashSet<String>, to: HashSet<String>, data: String, subject: Option<String>) -> Self {
+    pub fn new(
+        from: HashSet<String>,
+        to: HashSet<String>,
+        data: String,
+        subject: Option<String>,
+    ) -> Self {
         Self {
             from,
             to,
@@ -84,13 +89,23 @@ pub fn get_data_from_to(data: &str) -> (HashSet<String>, HashSet<String>) {
             current_header_value.push(' ');
             current_header_value.push_str(line.trim());
         } else if let Some((name, value)) = parse_header_line(line) {
-            process_header(&current_header_name, &current_header_value, &mut from_set, &mut to_set);
+            process_header(
+                &current_header_name,
+                &current_header_value,
+                &mut from_set,
+                &mut to_set,
+            );
             current_header_name = name;
             current_header_value = value.to_string();
         }
     }
 
-    process_header(&current_header_name, &current_header_value, &mut from_set, &mut to_set);
+    process_header(
+        &current_header_name,
+        &current_header_value,
+        &mut from_set,
+        &mut to_set,
+    );
 
     (from_set, to_set)
 }

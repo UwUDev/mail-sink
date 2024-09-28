@@ -1,6 +1,6 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::sync::Mutex;
 use lazy_static::lazy_static;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const EPOCH: u128 = 1704067200000; // January 1, 2024, 00:00:00 UTC in milliseconds
 const SEQUENCE_BITS: u32 = 12;

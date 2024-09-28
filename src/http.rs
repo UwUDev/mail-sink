@@ -23,7 +23,6 @@ enum Method {
     POST,
     PUT,
     DELETE,
-    // Add other methods as needed
 }
 
 impl Method {
@@ -341,7 +340,8 @@ async fn get_mails_handler(
         let mut json: Value = serde_json::to_value(mail)?;
         let parsed_body = mail.parse_body();
         json["body"] = Value::String(parsed_body);
-        json["timestamp"] = Value::Number(serde_json::Number::from_str(&mail.timestamp().to_string()).unwrap());
+        json["timestamp"] =
+            Value::Number(serde_json::Number::from_str(&mail.timestamp().to_string()).unwrap());
         mails_json.push(json);
     }
     let json = serde_json::to_string(&mails_json)?;
@@ -462,43 +462,28 @@ async fn preview_mail_handler(
 
     let mut writer = writer.lock().await;
 
-    if let Ok(Some(data)) = result {
-        let mail: Mail = bincode::deserialize(&data)?;
-        let html_body = mail.parse_body();
-
-        let html = format!(
-            r#"
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Mail Preview</title>
-            </head>
-            <body>
-                <h1>From: {}</h1>
-                <h2>To: {}</h2>
-                <html>
-                    {}
-                </html>
-            </body>
-            </html>
-            "#,
-            mail.from.iter().next().unwrap(),
-            mail.to.iter().next().unwrap(),
-            html_body
-        );
-
-        writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
-        writer.write_all(b"Content-Type: text/html\r\n").await?;
+    if result.is_err() {
         writer
-            .write_all(format!("Content-Length: {}\r\n", html.len()).as_bytes())
+            .write_all(b"HTTP/1.1 500 Internal Server Error\r\n\r\n")
             .await?;
-        writer.write_all(b"\r\n").await?;
-
-        writer.write_all(html.as_bytes()).await?;
-    } else {
+        writer.flush().await?;
+        return Ok(());
+    } else if result.unwrap().is_none() {
         writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
+        writer.flush().await?;
+        return Ok(());
     }
 
+    // return preview.html
+    let body = include_bytes!("pages/preview.html");
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer.write_all(b"Content-Type: text/html\r\n").await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", body.len()).as_bytes())
+        .await?;
+
+    writer.write_all(b"\r\n").await?;
+    writer.write_all(body).await?;
     writer.flush().await?;
     Ok(())
 }
