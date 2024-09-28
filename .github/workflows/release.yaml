@@ -1,0 +1,105 @@
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    outputs:
+      default-branch: ${{ steps.env.outputs.default-branch }}
+      remote: ${{ steps.env.outputs.remote }}
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v3  # Updated to the latest stable version
+
+      - name: ⚙️ Setup environment
+        id: env
+        run: |
+          REMOTE=origin
+          DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+          echo "remote=$REMOTE" >> $GITHUB_OUTPUT
+          echo "default-branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+          echo "Branch $DEFAULT_BRANCH on remote $REMOTE"
+
+      - name: 📝 Update version from git tag
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'github@users.noreply.github.com'
+          git fetch --tags
+          git checkout ${{ steps.env.outputs.default-branch }}
+          git pull ${{ steps.env.outputs.remote }} ${{ steps.env.outputs.default-branch }}
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          echo "Updating version to $VERSION in Cargo.toml"
+          sed -i -E "s/^version = \"[^\"]+\"/version = \"$VERSION\"/" Cargo.toml
+          git add Cargo.toml
+          git add Cargo.lock
+          git commit -m "Bump version to $VERSION"
+          git push ${{ steps.env.outputs.remote }} ${{ steps.env.outputs.default-branch }}
+
+  build:
+    needs: update-version
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v3  # Updated to the latest stable version
+
+      - name: ⬇️ Force fetch of repo to get the absolute latest version
+        run: |
+          git fetch --tags
+          git checkout ${{ needs.update-version.outputs.default-branch }}
+          git pull ${{ needs.update-version.outputs.remote }} ${{ needs.update-version.outputs.default-branch }}
+
+      - name: ⚙️ Install UPX
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          install-only: true
+
+      - name: ⬇️ Get Current Release
+        id: get-release
+        uses: joutvhu/get-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ⬇️ Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: 📦 Build binary
+        run: cargo build --release
+
+      - name: 📦 Compress binary with UPX (Windows)
+        if: runner.os == 'Windows'
+        run: upx --best --lzma target\\release\\mail-sink.exe
+
+      - name: 📦 Compress binary with UPX (Linux)
+        if: runner.os == 'Linux'
+        run: upx --best --lzma target/release/mail-sink
+
+      - name: 🚀 Upload Release Asset (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.get-release.outputs.upload_url }}
+          asset_path: target\\release\\mail-sink.exe
+          asset_name: mail-sink.exe
+          asset_content_type: application/octet-stream
+
+      - name: 🚀 Upload Release Asset (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.get-release.outputs.upload_url }}
+          asset_path: target/release/mail-sink
+          asset_name: mail-sink
+          asset_content_type: application/octet-stream
