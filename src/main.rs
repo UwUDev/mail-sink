@@ -2,6 +2,7 @@ mod cli;
 mod http;
 mod smtp;
 mod snowflake;
+mod tests;
 
 use crate::cli::*;
 use clap::{CommandFactory, Parser};

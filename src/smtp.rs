@@ -152,6 +152,14 @@ pub(crate) async fn handle_client(
                 data.push_str(&line);
             }
 
+            let (f, t) = get_data_from_to(&data);
+            f.iter().for_each(|s| {
+                from.insert(s.clone());
+            });
+            t.iter().for_each(|s| {
+                to.insert(s.clone());
+            });
+
             body = data.clone();
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper == "QUIT" {
@@ -222,6 +230,14 @@ async fn handle_tls_client(
                 data.push_str(&line);
             }
 
+            let (f, t) = get_data_from_to(&data);
+            f.iter().for_each(|s| {
+                from.insert(s.clone());
+            });
+            t.iter().for_each(|s| {
+                to.insert(s.clone());
+            });
+
             body = data.clone();
 
             writer.write_all(b"250 OK\r\n").await?;
@@ -265,3 +281,38 @@ pub fn load_tls_config() -> Result<ServerConfig, Box<dyn Error + Send + Sync>> {
 
     Ok(config)
 }
+
+pub fn get_data_from_to(data: &String) -> (HashSet<String>, HashSet<String>) {
+    let mut lines = data.lines();
+    let mut from_set = HashSet::new();
+    let mut to_set = HashSet::new();
+    while let Some(line) = lines.next() {
+        if line.to_lowercase().starts_with("from:") {
+            let from = line.splitn(2, ':').nth(1).unwrap();
+            from.split(",")
+                .map(|s| s.trim())
+                .for_each(|s| {
+                    if s.contains("<") {
+                        from_set.insert(s.split("<").nth(1).unwrap().split(">").nth(0).unwrap().to_string());
+                    } else {
+                        from_set.insert(s.to_string());
+                    }
+                });
+        }
+        if line.to_lowercase().starts_with("to:") {
+            let to = line.splitn(2, ':').nth(1).unwrap();
+            to.split(",")
+                .map(|s| s.trim())
+                .for_each(|s| {
+                    if s.contains("<") {
+                        to_set.insert(s.split("<").nth(1).unwrap().split(">").nth(0).unwrap().to_string());
+                    } else {
+                        to_set.insert(s.to_string());
+                    }
+                });
+        }
+    }
+
+    (from_set, to_set)
+}
+

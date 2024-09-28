@@ -442,7 +442,7 @@ async fn info_handler(
     Ok(())
 }
 
-async fn preview_mail_handler(
+async fn preview_mail_handler( // TODO: show all FROM and TO
     request: Request,
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
     db: Arc<Mutex<Db>>,
