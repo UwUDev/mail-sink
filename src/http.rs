@@ -315,7 +315,7 @@ async fn get_mails_handler(
         .unwrap();
 
     let db = db.lock().await;
-    let mut iter = db.iter();
+    let mut iter = db.iter().rev();
     let mut mails = Vec::new();
     let mut count = 0;
 
