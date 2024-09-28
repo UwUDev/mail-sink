@@ -72,10 +72,10 @@ pub(crate) async fn handle_client(
             }
             break;
         } else if command_upper.starts_with("MAIL FROM") {
-            from.insert(command[10..].to_string().replace("<", "").replace(">", ""));
+            from.insert(command[10..].to_string().replace("<", "").replace(">", "").trim().to_string());
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper.starts_with("RCPT TO") {
-            to.insert(command[8..].to_string().replace("<", "").replace(">", ""));
+            to.insert(command[8..].to_string().replace("<", "").replace(">", "").trim().to_string());
             writer.write_all(b"250 OK\r\n").await?;
         } else if command_upper == "DATA" {
             writer

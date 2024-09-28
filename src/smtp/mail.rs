@@ -121,7 +121,7 @@ fn process_header(
 fn extract_emails(header_value: &str, email_set: &mut HashSet<String>) {
     for email_str in header_value.split(',').map(str::trim) {
         if let Some(email) = extract_email_address(email_str) {
-            email_set.insert(email);
+            email_set.insert(email.trim().to_string());
         }
     }
 }
