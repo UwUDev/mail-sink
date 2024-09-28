@@ -45,8 +45,16 @@
             cursor: pointer;
         }
 
+        .button.warning {
+            background-color: #f53b57;
+        }
+
         .button:hover {
             background-color: #3867d6;
+        }
+
+        .button.warning:hover {
+            background-color: #f03e3e;
         }
 
         .content {
@@ -70,13 +78,13 @@
         <p id="email-to">To: </p>
     </div>
     <center>
-        <div id="body-preview" class="content raw-text"></div>
+        <iframe id="body-preview" class="content" frameborder="0" width="100%" height="600"></iframe>
     </center>
     <div id="data-preview" class="content">
         <pre id="raw-data"></pre>
     </div>
 
-    <a id="toggle-button" class="button">Switch to raw data</a>
+    <a id="toggle-button" class="button warning">Load mail (will use your IP)</a>
 </div>
 
 <script>
@@ -99,16 +107,26 @@
         document.getElementById('email-to').innerText = `To: ${mail.to.join(', ')}`;
 
         const bodyPreview = document.getElementById('body-preview');
-        if (mail.body.startsWith('<')) {
-            bodyPreview.innerHTML = mail.body;
+        if (isHTML(mail.body)) {
+            const doc = bodyPreview.contentDocument || bodyPreview.contentWindow.document;
+            doc.body.innerHTML = mail.body;
         } else {
-            bodyPreview.innerText = mail.body;
+            const doc = bodyPreview.contentDocument || bodyPreview.contentWindow.document;
+            doc.body.innerText = mail.body;
         }
         document.getElementById('raw-data').innerText = mail.data;
-        bodyPreview.classList.add('active');
+    }
+
+    function isHTML(str) {
+        const doc = new DOMParser().parseFromString(str, 'text/html');
+        // check if the parsing resulted in any HTML elements
+        return Array.from(doc.body.childNodes).some(node => node.nodeType === 1);
     }
 
     function toggleView() {
+        const button = document.getElementById('toggle-button');
+        button.classList.remove('warning');
+
         const bodyPreview = document.getElementById('body-preview');
         const dataPreview = document.getElementById('data-preview');
         const toggleButton = document.getElementById('toggle-button');
