@@ -442,8 +442,6 @@ async fn info_handler(
     Ok(())
 }
 
-// TODO: show all FROM and TO
-// TODO: Detect if it's not a HTML mail and replace new lines with <br>
 async fn preview_mail_handler(
     request: Request,
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,

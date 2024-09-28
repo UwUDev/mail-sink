@@ -194,20 +194,18 @@
 </section>
 <section id="mails">
     <h2>Mails</h2>
-    <!-- The delete all button -->
     <div id="delete-all-button" onclick="deleteAllMails()">Purge all mails</div>
     <table>
         <thead>
         <tr>
             <th>To</th>
             <th>From</th>
-            <th>Body</th>
+            <th>Description</th>
             <th>Date</th>
             <th>Actions</th>
         </tr>
         </thead>
         <tbody id="mail-table-body">
-            <!-- mails rows will be inserted here -->
         </tbody>
     </table>
     <div id="pagination">
@@ -426,21 +424,25 @@
 
                     let bodyText;
 
-                    if (isHTML(mail.body)) {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(mail.body, 'text/html');
+                    if (!mail.subject) {
+                        if (isHTML(mail.body)) {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(mail.body, 'text/html');
 
-                        // remove all <style> elements from the document
-                        const styleElements = doc.getElementsByTagName('style');
-                        for (let i = styleElements.length - 1; i >= 0; i--) {
-                            styleElements[i].parentNode.removeChild(styleElements[i]);
+                            // remove all <style> elements from the document
+                            const styleElements = doc.getElementsByTagName('style');
+                            for (let i = styleElements.length - 1; i >= 0; i--) {
+                                styleElements[i].parentNode.removeChild(styleElements[i]);
+                            }
+
+                            // get the content of the <body> if present, otherwise get the content of the <html>
+                            bodyText = doc.body ? doc.body.textContent : doc.documentElement.textContent || "";
+                        } else {
+                            // no html detected
+                            bodyText = mail.body;
                         }
-
-                        // get the content of the <body> if present, otherwise get the content of the <html>
-                        bodyText = doc.body ? doc.body.textContent : doc.documentElement.textContent || "";
                     } else {
-                        // no html detected
-                        bodyText = mail.body;
+                        bodyText = mail.subject;
                     }
 
 
