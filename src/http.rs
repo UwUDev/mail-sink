@@ -13,7 +13,7 @@ use tokio::net::TcpStream;
 
 use tokio::sync::{Mutex as AsyncMutex, Mutex};
 
-use crate::smtp::Mail;
+use crate::smtp::mail::Mail;
 use url::form_urlencoded;
 use url::Url;
 
@@ -442,7 +442,9 @@ async fn info_handler(
     Ok(())
 }
 
-async fn preview_mail_handler( // TODO: show all FROM and TO
+// TODO: show all FROM and TO
+// TODO: Detect if it's not a HTML mail and replace new lines with <br>
+async fn preview_mail_handler(
     request: Request,
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
     db: Arc<Mutex<Db>>,

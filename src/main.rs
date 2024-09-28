@@ -161,7 +161,7 @@ async fn run_cleaner_service(
         let mut count = 0;
         for key in keys {
             let mail = db.get(&key).unwrap().unwrap();
-            let mail: smtp::Mail = bincode::deserialize(&mail).unwrap();
+            let mail: smtp::mail::Mail = bincode::deserialize(&mail).unwrap();
             let current_millis = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()

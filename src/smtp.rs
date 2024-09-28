@@ -1,7 +1,7 @@
+pub(crate) mod mail;
+
 use crate::SharedError;
-use mailparse::parse_mail;
 use rustls_pemfile::{certs, pkcs8_private_keys};
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
@@ -12,63 +12,9 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
+use crate::smtp::mail::{get_data_from_to, Mail};
 
-#[derive(Default, Serialize, Deserialize)]
-pub struct Mail {
-    pub from: HashSet<String>,
-    pub to: HashSet<String>,
-    pub data: String,
-    pub id: u128,
-}
 
-impl Mail {
-    pub fn parse_body(&self) -> String {
-        let mail = match parse_mail(self.data.as_bytes()) {
-            Ok(parsed) => parsed,
-            // return raw body if parsing fails
-            Err(_) => {
-                let mut body = self.data.clone();
-                // after the headers
-                if let Some(index) = body.find("\r\n\r\n") {
-                    body = body[index + 4..].to_string();
-                }
-                return body;
-            }
-        };
-
-        // check if the email is multipart
-        if mail.subparts.is_empty() {
-            // not multipart, return the body as is
-            mail.get_body().unwrap_or_else(|_| String::new())
-        } else {
-            // prioritize 'text/html' parts
-            for part in &mail.subparts {
-                let content_type = part.ctype.mimetype.to_lowercase();
-                if content_type == "text/html" {
-                    // Return the HTML part's body
-                    return part.get_body().unwrap_or_else(|_| String::new());
-                }
-            }
-            // no 'text/html' part found, return the first multipart's body
-            mail.subparts[0]
-                .get_body()
-                .unwrap_or_else(|_| String::new())
-        }
-    }
-
-    pub fn timestamp(&self) -> u128 {
-        crate::snowflake::to_timestamp(self.id)
-    }
-
-    pub fn new(from: HashSet<String>, to: HashSet<String>, data: String) -> Self {
-        Self {
-            from,
-            to,
-            data,
-            id: crate::snowflake::next(),
-        }
-    }
-}
 pub(crate) async fn handle_client(
     stream: TcpStream,
     tls_config: Arc<ServerConfig>,
@@ -281,38 +227,3 @@ pub fn load_tls_config() -> Result<ServerConfig, Box<dyn Error + Send + Sync>> {
 
     Ok(config)
 }
-
-pub fn get_data_from_to(data: &String) -> (HashSet<String>, HashSet<String>) {
-    let mut lines = data.lines();
-    let mut from_set = HashSet::new();
-    let mut to_set = HashSet::new();
-    while let Some(line) = lines.next() {
-        if line.to_lowercase().starts_with("from:") {
-            let from = line.splitn(2, ':').nth(1).unwrap();
-            from.split(",")
-                .map(|s| s.trim())
-                .for_each(|s| {
-                    if s.contains("<") {
-                        from_set.insert(s.split("<").nth(1).unwrap().split(">").nth(0).unwrap().to_string());
-                    } else {
-                        from_set.insert(s.to_string());
-                    }
-                });
-        }
-        if line.to_lowercase().starts_with("to:") {
-            let to = line.splitn(2, ':').nth(1).unwrap();
-            to.split(",")
-                .map(|s| s.trim())
-                .for_each(|s| {
-                    if s.contains("<") {
-                        to_set.insert(s.split("<").nth(1).unwrap().split(">").nth(0).unwrap().to_string());
-                    } else {
-                        to_set.insert(s.to_string());
-                    }
-                });
-        }
-    }
-
-    (from_set, to_set)
-}
-
