@@ -6,6 +6,7 @@ mod parsing_tester {
     fn test_parse_body_multipart() {
         let body = std::fs::read_to_string("test/samples/discord_mail.body").unwrap();
         let subject = get_subject(&body);
+        println!("subject: {:?}", subject);
         let mail = Mail {
             from: Default::default(),
             to: Default::default(),
@@ -20,7 +21,8 @@ mod parsing_tester {
         let (from, _) = get_data_from_to(&mail.data);
         assert!(from.contains("noreply@discord.com"));
 
-        assert_eq!(mail.subject.unwrap(), "Verify Email Address for Discord");
+        //should've decoded the subject with rfc2047 decoder
+        assert_eq!(mail.subject.unwrap(), "Vérifie ton adresse e-mail Discord");
     }
 
     #[test]

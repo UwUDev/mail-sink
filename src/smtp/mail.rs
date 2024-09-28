@@ -1,6 +1,7 @@
 use mailparse::parse_mail;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use rfc2047_decoder::decode;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct Mail {
@@ -69,7 +70,8 @@ impl Mail {
 pub fn get_subject(data: &str) -> Option<String> {
     for line in data.lines() {
         if line.to_lowercase().starts_with("subject:") {
-            return Some(line[8..].trim().to_string());
+            let subject = line[8..].trim().to_string();
+            return Some(decode(&subject).unwrap_or(subject));
         }
     }
 

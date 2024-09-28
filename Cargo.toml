@@ -25,6 +25,7 @@ num_cpus = "1.16.0"
 percent-encoding = "2.3.1"
 mailparse = "0.13"
 lazy_static = "1.5.0"
+rfc2047-decoder = "1.0.5"
 
 [profile.release]
 opt-level = "z"
