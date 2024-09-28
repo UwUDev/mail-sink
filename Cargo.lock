@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "mail-sink"
-version = "0.0.1"
+version = "0.0.3"
 dependencies = [
  "bincode",
  "bytes",

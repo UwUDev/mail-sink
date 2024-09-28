@@ -13,7 +13,7 @@ jobs:
       remote: ${{ steps.env.outputs.remote }}
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v3  # Updated to the latest stable version
+        uses: actions/checkout@v3
 
       - name: ⚙️ Setup environment
         id: env
@@ -50,7 +50,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v3  # Updated to the latest stable version
+        uses: actions/checkout@v3
 
       - name: ⬇️ Force fetch of repo to get the absolute latest version
         run: |
@@ -62,12 +62,6 @@ jobs:
         uses: crazy-max/ghaction-upx@v3
         with:
           install-only: true
-
-      - name: ⬇️ Get Current Release
-        id: get-release
-        uses: joutvhu/get-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: ⬇️ Setup Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -86,22 +80,9 @@ jobs:
         if: runner.os == 'Linux'
         run: upx --best --lzma target/release/mail-sink
 
-      - name: 🚀 Upload Release Asset (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-release-asset@v3
+      - name: 🚀 Upload Release Assets
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ steps.get-release.outputs.upload_url }}
-          asset_path: target\\release\\mail-sink.exe
-          asset_name: mail-sink.exe
-          asset_content_type: application/octet-stream
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🚀 Upload Release Asset (Linux)
-        if: runner.os == 'Linux'
-        uses: actions/upload-release-asset@v3
-        with:
-          upload_url: ${{ steps.get-release.outputs.upload_url }}
-          asset_path: target/release/mail-sink
-          asset_name: mail-sink
-          asset_content_type: application/octet-stream
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: target/release/mail-sink*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
