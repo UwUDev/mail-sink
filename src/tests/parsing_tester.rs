@@ -5,10 +5,12 @@ mod parsing_tester {
     #[test]
     fn test_parse_body_multipart() {
         let body = std::fs::read_to_string("test/samples/discord_mail.body").unwrap();
+        let subject = get_subject(&body);
         let mail = Mail {
             from: Default::default(),
             to: Default::default(),
             data: body,
+            subject,
             id: 0,
         };
 
@@ -17,15 +19,19 @@ mod parsing_tester {
 
         let (from, _) = get_data_from_to(&mail.data);
         assert!(from.contains("noreply@discord.com"));
+
+        assert_eq!(mail.subject.unwrap(), "Verify Email Address for Discord");
     }
 
     #[test]
     fn test_parse_body_simple() {
         let body = std::fs::read_to_string("test/samples/raw.body").unwrap();
+        let subject = get_subject(&body);
         let mail = Mail {
             from: Default::default(),
             to: Default::default(),
             data: body,
+            subject,
             id: 0,
         };
 
@@ -34,6 +40,8 @@ mod parsing_tester {
 
         let (from, to) = get_data_from_to(&mail.data);
         assert!(from.contains("test@test.com"));
-        println!("{}", to.len());
+        assert_eq!(to.len(), 8);
+
+        assert_eq!(mail.subject.unwrap(), "test smtp--");
     }
 }

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Mail {
     pub from: HashSet<String>,
     pub to: HashSet<String>,
-    // TODO: subject
+    pub subject: Option<String>,
     pub data: String,
     pub id: u128,
 }
@@ -50,14 +50,25 @@ impl Mail {
         crate::snowflake::to_timestamp(self.id)
     }
 
-    pub fn new(from: HashSet<String>, to: HashSet<String>, data: String) -> Self {
+    pub fn new(from: HashSet<String>, to: HashSet<String>, data: String, subject: Option<String>) -> Self {
         Self {
             from,
             to,
+            subject,
             data,
             id: crate::snowflake::next(),
         }
     }
+}
+
+pub fn get_subject(data: &str) -> Option<String> {
+    for line in data.lines() {
+        if line.to_lowercase().starts_with("subject:") {
+            return Some(line[8..].trim().to_string());
+        }
+    }
+
+    None
 }
 
 pub fn get_data_from_to(data: &str) -> (HashSet<String>, HashSet<String>) {

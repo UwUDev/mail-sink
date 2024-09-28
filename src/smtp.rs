@@ -12,7 +12,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
-use crate::smtp::mail::{get_data_from_to, Mail};
+use crate::smtp::mail::{get_data_from_to, get_subject, Mail};
 
 
 pub(crate) async fn handle_client(
@@ -119,7 +119,8 @@ pub(crate) async fn handle_client(
         }
     }
 
-    Ok(Mail::new(from, to, body))
+    let subject = get_subject(&body);
+    Ok(Mail::new(from, to, body, subject))
 }
 
 async fn handle_tls_client(
@@ -194,7 +195,8 @@ async fn handle_tls_client(
         }
     }
 
-    Ok(Mail::new(from, to, body))
+    let subject = get_subject(&body);
+    Ok(Mail::new(from, to, body, subject))
 }
 
 pub fn load_tls_config() -> Result<ServerConfig, Box<dyn Error + Send + Sync>> {
