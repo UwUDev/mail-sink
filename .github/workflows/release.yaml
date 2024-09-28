@@ -88,18 +88,20 @@ jobs:
 
       - name: 🚀 Upload Release Asset (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v3
         with:
           upload_url: ${{ steps.get-release.outputs.upload_url }}
           asset_path: target\\release\\mail-sink.exe
           asset_name: mail-sink.exe
           asset_content_type: application/octet-stream
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🚀 Upload Release Asset (Linux)
         if: runner.os == 'Linux'
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v3
         with:
           upload_url: ${{ steps.get-release.outputs.upload_url }}
           asset_path: target/release/mail-sink
           asset_name: mail-sink
           asset_content_type: application/octet-stream
+          token: ${{ secrets.GITHUB_TOKEN }}
