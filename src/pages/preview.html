@@ -106,18 +106,15 @@
         document.getElementById('email-from').innerText = `From: ${mail.from.join(', ')}`;
         document.getElementById('email-to').innerText = `To: ${mail.to.join(', ')}`;
 
-        const bodyPreview = document.getElementById('body-preview');
-        if (isHTML(mail.body)) {
-            const doc = bodyPreview.contentDocument || bodyPreview.contentWindow.document;
-            doc.body.innerHTML = mail.body;
+        const rawDataElement = document.getElementById('raw-data');
+        rawDataElement.innerText = mail.data;
+
+        const toggleButton = document.getElementById('toggle-button');
+        if (!isHTML(mail.body)) {
+            loadMailContent(mail.body);
         } else {
-            const doc = bodyPreview.contentDocument || bodyPreview.contentWindow.document;
-            doc.body.innerText = mail.body;
-            doc.body.style.color = '#fff';
-            // skip IP leaking warning because it's raw text
-            document.getElementById('toggle-button').click();
+            toggleButton.addEventListener('click', () => loadMailContent(mail.body));
         }
-        document.getElementById('raw-data').innerText = mail.data;
     }
 
     function isHTML(str) {
@@ -126,10 +123,23 @@
         return Array.from(doc.body.childNodes).some(node => node.nodeType === 1);
     }
 
-    function toggleView() {
-        const button = document.getElementById('toggle-button');
-        button.classList.remove('warning');
+    function loadMailContent(body) {
+        const bodyPreview = document.getElementById('body-preview');
+        const doc = bodyPreview.contentDocument || bodyPreview.contentWindow.document;
+        doc.open();
+        doc.write(body);
+        doc.close();
 
+        if (!isHTML(body)) {
+            doc.body.innerText = body;
+            doc.body.style.color = '#fff';
+        }
+
+        document.getElementById('toggle-button').classList.remove('warning');
+        toggleView();
+    }
+
+    function toggleView() {
         const bodyPreview = document.getElementById('body-preview');
         const dataPreview = document.getElementById('data-preview');
         const toggleButton = document.getElementById('toggle-button');
@@ -144,8 +154,6 @@
             toggleButton.innerText = 'Switch to raw data';
         }
     }
-
-    document.getElementById('toggle-button').addEventListener('click', toggleView);
 
     document.addEventListener('DOMContentLoaded', async () => {
         const {mailId, key} = parseQueryParams();
