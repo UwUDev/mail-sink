@@ -84,7 +84,7 @@
         <pre id="raw-data"></pre>
     </div>
 
-    <a id="toggle-button" class="button warning">Load mail (will use your IP)</a>
+    <a id="toggle-button" class="button warning">Load mail (can leak your IP)</a>
 </div>
 
 <script>
@@ -113,6 +113,9 @@
         } else {
             const doc = bodyPreview.contentDocument || bodyPreview.contentWindow.document;
             doc.body.innerText = mail.body;
+            doc.body.style.color = '#fff';
+            // skip IP leaking warning because it's raw text
+            document.getElementById('toggle-button').click();
         }
         document.getElementById('raw-data').innerText = mail.data;
     }
