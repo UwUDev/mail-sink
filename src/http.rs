@@ -174,7 +174,7 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
         (
             Method::DELETE,
             "/mails".to_string(),
-            Box::new(|_, writer, db| Box::pin(delete_mails_handler(writer, db))),
+            Box::new(|_, writer, db| Box::pin(delete_all_mails_handler(writer, db))),
         ),
         (
             Method::DELETE,
@@ -306,9 +306,23 @@ async fn delete_mail_handler(
 
     let mut writer = writer.lock().await;
 
-    if result.is_ok() {
-        db.remove(mail_id.to_le_bytes()).unwrap();
-        writer.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await?;
+    if let Ok(Some(data)) = result {
+        db.remove(mail_id.to_le_bytes());
+        let mail: Mail = bincode::deserialize(&data)?;
+        let mut json = serde_json::to_value(&mail)?;
+        json["body"] = Value::String(mail.parse_body());
+        Value::Number(serde_json::Number::from_str(&mail.timestamp().to_string()).unwrap());
+        let json = serde_json::to_string(&json)?;
+
+        writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+        writer
+            .write_all(b"Content-Type: application/json\r\n")
+            .await?;
+        writer
+            .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+            .await?;
+        writer.write_all(b"\r\n").await?;
+        writer.write_all(json.as_bytes()).await?;
     } else {
         writer.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await?;
     }
@@ -381,15 +395,27 @@ async fn get_mails_handler(
     Ok(())
 }
 
-async fn delete_mails_handler(
+async fn delete_all_mails_handler(
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
     db: Arc<Mutex<Db>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let db = db.lock().await;
+    let count = db.len();
     db.clear().unwrap();
 
+    let json = format!(r#"{{"deleted":{}}}"#, count);
+
     let mut writer = writer.lock().await;
-    writer.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await?;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer
+        .write_all(b"Content-Type: application/json\r\n")
+        .await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+        .await?;
+    writer.write_all(b"\r\n").await?;
+    writer.write_all(json.as_bytes()).await?;
+
     writer.flush().await?;
     Ok(())
 }
@@ -632,13 +658,17 @@ async fn delete_mails_from_to_handler(
         }
     }
 
+    let count = mail_ids.len();
+
     for id in mail_ids {
         match db.remove(id.to_le_bytes()) {
             Ok(_) => {}
             Err(e) => eprint!("Failed te detelet mais {}: {}", id, e)
         }
     }
-    let json = String::from("{}");
+
+
+    let json = format!(r#"{{"deleted":{}}}"#, count);
 
     let mut writer = writer.lock().await;
     writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;

@@ -1,7 +1,7 @@
 use mailparse::parse_mail;
+use rfc2047_decoder::decode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use rfc2047_decoder::decode;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct Mail {
