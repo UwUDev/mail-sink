@@ -307,7 +307,7 @@ async fn delete_mail_handler(
     let mut writer = writer.lock().await;
 
     if let Ok(Some(data)) = result {
-        db.remove(mail_id.to_le_bytes());
+        db.remove(mail_id.to_le_bytes()).unwrap();
         let mail: Mail = bincode::deserialize(&data)?;
         let mut json = serde_json::to_value(&mail)?;
         json["body"] = Value::String(mail.parse_body());
