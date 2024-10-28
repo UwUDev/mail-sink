@@ -152,6 +152,16 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             Box::new(|request, writer, db| Box::pin(get_mail_handler(request, writer, db))),
         ),
         (
+            Method::GET,
+            "/mails/to/:email".to_string(),
+            Box::new(|request, writer, db| Box::pin(get_mail_from_to_handler(request, writer, db, true))),
+        ),
+        (
+            Method::GET,
+            "/mails/from/:email".to_string(),
+            Box::new(|request, writer, db| Box::pin(get_mail_from_to_handler(request, writer, db, false))),
+        ),
+        (
             Method::DELETE,
             "/mails/:mail_id".to_string(),
             Box::new(|request, writer, db| Box::pin(delete_mail_handler(request, writer, db))),
@@ -500,6 +510,86 @@ async fn panel_handler(
 
     writer.write_all(b"\r\n").await?;
     writer.write_all(body).await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn get_mail_from_to_handler(
+    request: Request,
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>,
+    to: bool,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let email_filter = request.params.get("email").unwrap().to_lowercase();
+    let limit = request
+        .query
+        .get("limit")
+        .unwrap_or(&String::from("10"))
+        .parse::<usize>()
+        .unwrap();
+    let offset = request
+        .query
+        .get("offset")
+        .unwrap_or(&String::from("0"))
+        .parse::<usize>()
+        .unwrap();
+
+    let db = db.lock().await;
+    let mut iter = db.iter().rev();
+    let mut mails = Vec::new();
+    let mut count = 0;
+
+    for _ in 0..offset {
+        if iter.next().is_none() {
+            break;
+        }
+    }
+
+    while let Some(result) = iter.next() {
+        let (_, data) = result?;
+        let mail: Mail = bincode::deserialize(&data)?;
+
+        if to {
+            if mail.to.iter().any(|to_email| to_email.to_lowercase() == email_filter) {
+                mails.push(mail);
+                count += 1;
+                if count >= limit {
+                    break;
+                }
+            }
+        } else {
+            if mail.from.iter().any(|to_email| to_email.to_lowercase() == email_filter) {
+                mails.push(mail);
+                count += 1;
+                if count >= limit {
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut mails_json = Vec::new();
+    for mail in &mails {
+        let mut json: Value = serde_json::to_value(mail)?;
+        let parsed_body = mail.parse_body();
+        json["body"] = Value::String(parsed_body);
+        json["timestamp"] =
+            Value::Number(serde_json::Number::from_str(&mail.timestamp().to_string()).unwrap());
+        mails_json.push(json);
+    }
+    let json = serde_json::to_string(&mails_json)?;
+
+    let mut writer = writer.lock().await;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer
+        .write_all(b"Content-Type: application/json\r\n")
+        .await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+        .await?;
+    writer.write_all(b"\r\n").await?;
+    writer.write_all(json.as_bytes()).await?;
+
     writer.flush().await?;
     Ok(())
 }

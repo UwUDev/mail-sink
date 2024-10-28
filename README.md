@@ -88,19 +88,30 @@ The HTTP API is accessible by adding `?k=your_key` to the URL.
   GET /mails
   ```
   Pagination params:
-  - `?limit`: The maximum amount of returned mails *(default: 20)*
+  - `?limit`: The maximum amount of returned mails *(default 10)*
   - `?offset`: The pagination offset *(default: 0)*
 
 
 - **Retrieve a specific email (JSON format):**
   ```
-  GET /mails/<email>
-  ...
-  Parameters:
-  - ?limit: number of emails to return.
-  - ?offset: number of emails to skip.
+  GET /mails/<mail_id>
   ```
+  
+- **Retrieve all emails sent to a specific email address (JSON format):**
+  ```
+  GET /mails/to/<emai_address>
+  ```
+  Pagination params:
+    - `?limit`: The maximum amount of returned mails *(default 10)*
+    - `?offset`: The pagination offset *(default: 0)*
 
+- **Retrieve all emails sent from a specific email address (JSON format):**
+  ```
+  GET /mails/from/<emai_address>
+  ```
+  Pagination params:
+    - `?limit`: The maximum amount of returned mails *(default 10)*
+    - `?offset`: The pagination offset *(default: 0)*
 
 - **Delete a specific email:**
   ```
