@@ -58,26 +58,44 @@ pub fn print_api_usage() {
     println!("The HTTP API is accessible by adding ?k=your_key to the URL.");
     println!();
     println!(
-        "- {} {}             Retrieve all stored emails (JSON format)",
+        "- {} {}                       Retrieve all stored emails (JSON format)",
         "GET".blue(),
         "/mails".bold()
-    );
-    println!(
-        "- {} {}     Retrieve a specific email (JSON format)",
-        "GET".blue(),
-        "/mails/<email>".bold()
     );
     println!(
         "  • {}: ?limit and ?offset for pagination",
         "Parameters".bright_black()
     );
     println!(
-        "- {} {}  Delete a specific email",
+        "- {} {}            Retrieve a specific email (JSON format)",
+        "GET".blue(),
+        "/mails/<email_id>".bold()
+    );
+    println!(
+        "- {} {}  Retrieve all emails from (JSON format)",
+        "GET".blue(),
+        "/mails/from/<email_address>".bold()
+    );
+    println!(
+        "  • {}: ?limit and ?offset for pagination",
+        "Parameters".bright_black()
+    );
+    println!(
+        "- {} {}    Retrieve all emails to (JSON format)",
+        "GET".blue(),
+        "/mails/to/<email_address>".bold()
+    );
+    println!(
+        "  • {}: ?limit and ?offset for pagination",
+        "Parameters".bright_black()
+    );
+    println!(
+        "- {} {}            Delete a specific email",
         "DELETE".red(),
         "/mails/<email>".bold()
     );
     println!(
-        "- {} {}          Delete {} stored emails",
+        "- {} {}                    Delete {} stored emails",
         "DELETE".red(),
         "/mails".bold(),
         "all".bold()

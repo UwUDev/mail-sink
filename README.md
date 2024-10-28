@@ -99,7 +99,7 @@ The HTTP API is accessible by adding `?k=your_key` to the URL.
   
 - **Retrieve all emails sent to a specific email address (JSON format):**
   ```
-  GET /mails/to/<emai_address>
+  GET /mails/to/<email_address>
   ```
   Pagination params:
     - `?limit`: The maximum amount of returned mails *(default 10)*
@@ -107,7 +107,7 @@ The HTTP API is accessible by adding `?k=your_key` to the URL.
 
 - **Retrieve all emails sent from a specific email address (JSON format):**
   ```
-  GET /mails/from/<emai_address>
+  GET /mails/from/<email_address>
   ```
   Pagination params:
     - `?limit`: The maximum amount of returned mails *(default 10)*
