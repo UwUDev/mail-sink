@@ -39,18 +39,15 @@ pub struct Args {
 }
 
 pub static INTRO: &str = "
-Mail Sink is a simple mail server that accepts any incoming
-email and stores it in a database. It provides an HTTP API
-to retrieve and delete the stored emails. It can be used for
-testing email sending functionality in your application, or
-mass email verification / account generation.
+Mail Sink is a simple mail server that accepts any incomingemail and stores it in a database. It
+provides an HTTP API to retrieve and delete the stored emails. It can be used for testing email
+sending functionality in your application, or mass email verification / account generation.
 
 
 **Note:**
-Port numbers under 1024 require root privileges. If you want
-to use a port number lower than 1024, you can use a reverse
-proxy like Nginx or Apache to forward the traffic to the Mail
-Sink server running on a higher port number.
+Port numbers under 1024 require root privileges. If you want to use a port number lower than 1024
+you can use a reverse proxy like Nginx or Apache to forward the traffic to the Mail Sink server
+running on a higher port number.
 ";
 
 pub fn print_api_usage() {
@@ -58,7 +55,7 @@ pub fn print_api_usage() {
     println!("The HTTP API is accessible by adding ?k=your_key to the URL.");
     println!();
     println!(
-        "- {} {}                       Retrieve all stored emails (JSON format)",
+        "- {} {}                          Retrieve all stored emails (JSON format)",
         "GET".blue(),
         "/mails".bold()
     );
@@ -67,21 +64,12 @@ pub fn print_api_usage() {
         "Parameters".bright_black()
     );
     println!(
-        "- {} {}            Retrieve a specific email (JSON format)",
+        "- {} {}               Retrieve a specific email (JSON format)",
         "GET".blue(),
         "/mails/<email_id>".bold()
     );
     println!(
-        "- {} {}  Retrieve all emails from (JSON format)",
-        "GET".blue(),
-        "/mails/from/<email_address>".bold()
-    );
-    println!(
-        "  • {}: ?limit and ?offset for pagination",
-        "Parameters".bright_black()
-    );
-    println!(
-        "- {} {}    Retrieve all emails to (JSON format)",
+        "- {} {}       Retrieve all emails to (JSON format)",
         "GET".blue(),
         "/mails/to/<email_address>".bold()
     );
@@ -90,14 +78,33 @@ pub fn print_api_usage() {
         "Parameters".bright_black()
     );
     println!(
-        "- {} {}            Delete a specific email",
-        "DELETE".red(),
-        "/mails/<email>".bold()
+        "- {} {}     Retrieve all emails from (JSON format)",
+        "GET".blue(),
+        "/mails/from/<email_address>".bold()
     );
     println!(
-        "- {} {}                    Delete {} stored emails",
+        "  • {}: ?limit and ?offset for pagination",
+        "Parameters".bright_black()
+    );
+    println!(
+        "- {} {}            Delete a specific email",
+        "DELETE".red(),
+        "/mails/<email_id>".bold()
+    );
+    println!(
+        "- {} {}                       Delete {}",
         "DELETE".red(),
         "/mails".bold(),
-        "all".bold()
+        "all stored emails".bold()
+    );
+    println!(
+        "- {} {}    Delete all emails to",
+        "DELETE".red(),
+        "/mails/to/<email_address>".bold()
+    );
+    println!(
+        "- {} {}  Delete all emails from",
+        "DELETE".red(),
+        "/mails/from/<email_address>".bold()
     );
 }

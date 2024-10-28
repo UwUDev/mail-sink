@@ -124,6 +124,16 @@ The HTTP API is accessible by adding `?k=your_key` to the URL.
   DELETE /mails
   ```
 
+- **Delete all emails from:**
+  ```
+  DELETE /mails/from/<email_address>
+  ```
+
+- **Delete all emails to:**
+  ```
+  DELETE /mails/to/<email_address>
+  ```
+
 
 ## Notes
 Port numbers under 1024 require root privileges. If you want to use a port number lower than 1024, you can use a reverse proxy like Nginx or Apache to forward the traffic to the Mail Sink server running on a higher port number.

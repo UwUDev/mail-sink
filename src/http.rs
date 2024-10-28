@@ -154,12 +154,12 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
         (
             Method::GET,
             "/mails/to/:email".to_string(),
-            Box::new(|request, writer, db| Box::pin(get_mail_from_to_handler(request, writer, db, true))),
+            Box::new(|request, writer, db| Box::pin(get_mails_from_to_handler(request, writer, db, true))),
         ),
         (
             Method::GET,
             "/mails/from/:email".to_string(),
-            Box::new(|request, writer, db| Box::pin(get_mail_from_to_handler(request, writer, db, false))),
+            Box::new(|request, writer, db| Box::pin(get_mails_from_to_handler(request, writer, db, false))),
         ),
         (
             Method::DELETE,
@@ -175,6 +175,16 @@ fn build_routes() -> Vec<(Method, String, Handler)> {
             Method::DELETE,
             "/mails".to_string(),
             Box::new(|_, writer, db| Box::pin(delete_mails_handler(writer, db))),
+        ),
+        (
+            Method::DELETE,
+            "/mails/to/:email".to_string(),
+            Box::new(|request, writer, db| Box::pin(delete_mails_from_to_handler(request, writer, db, true))),
+        ),
+        (
+            Method::DELETE,
+            "/mails/from/:email".to_string(),
+            Box::new(|request, writer, db| Box::pin(delete_mails_from_to_handler(request, writer, db, false))),
         ),
         (
             Method::GET,
@@ -514,7 +524,7 @@ async fn panel_handler(
     Ok(())
 }
 
-async fn get_mail_from_to_handler(
+async fn get_mails_from_to_handler(
     request: Request,
     writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
     db: Arc<Mutex<Db>>,
@@ -578,6 +588,57 @@ async fn get_mail_from_to_handler(
         mails_json.push(json);
     }
     let json = serde_json::to_string(&mails_json)?;
+
+    let mut writer = writer.lock().await;
+    writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
+    writer
+        .write_all(b"Content-Type: application/json\r\n")
+        .await?;
+    writer
+        .write_all(format!("Content-Length: {}\r\n", json.len()).as_bytes())
+        .await?;
+    writer.write_all(b"\r\n").await?;
+    writer.write_all(json.as_bytes()).await?;
+
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn delete_mails_from_to_handler(
+    request: Request,
+    writer: Arc<AsyncMutex<BufWriter<tokio::net::tcp::OwnedWriteHalf>>>,
+    db: Arc<Mutex<Db>>,
+    to: bool,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let email_filter = request.params.get("email").unwrap().to_lowercase();
+
+    let db = db.lock().await;
+    let mut iter = db.iter().rev();
+    let mut mail_ids = Vec::new();
+
+
+    while let Some(result) = iter.next() {
+        let (_, data) = result?;
+        let mail: Mail = bincode::deserialize(&data)?;
+
+        if to {
+            if mail.to.iter().any(|to_email| to_email.to_lowercase() == email_filter) {
+                mail_ids.push(mail.id);
+            }
+        } else {
+            if mail.from.iter().any(|to_email| to_email.to_lowercase() == email_filter) {
+                mail_ids.push(mail.id);
+            }
+        }
+    }
+
+    for id in mail_ids {
+        match db.remove(id.to_le_bytes()) {
+            Ok(_) => {}
+            Err(e) => eprint!("Failed te detelet mais {}: {}", id, e)
+        }
+    }
+    let json = String::from("{}");
 
     let mut writer = writer.lock().await;
     writer.write_all(b"HTTP/1.1 200 OK\r\n").await?;
