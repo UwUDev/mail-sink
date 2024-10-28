@@ -179,6 +179,21 @@
             width: fit-content;
             margin-bottom: 20px;
         }
+
+        .actions {
+            text-align: center;
+            display: flex;
+            justify-content: center;
+        }
+
+        .actions button {
+            margin: 0 5px;
+        }
+
+        .actions > td {
+            display: flex;
+            justify-content: space-between;
+        }
     </style>
 </head>
 <body>
@@ -478,6 +493,7 @@
                         deleteMail(mail.id);
                     });
                     tdActions.appendChild(deleteBtn);
+                    tdActions.classList.add('actions');
 
                     tr.appendChild(tdActions);
 
