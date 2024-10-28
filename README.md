@@ -61,14 +61,13 @@ Run Mail Sink with specific options:
 ```
 
 ### Options:
-| short | long                   | value     | description                                         |
-|-------|------------------------|-----------|-----------------------------------------------------|
-| -h    | --help                 |           | Show help message.                                  |
-| -p    | --smtp-port            | SMTP PORT | Set the SMTP port. Default: `2525`                  |
-| -s    | --secondary-smtp-port  | SMTP PORT | Bind the SMTP server to a secondary port.           |
-|       | --http-port            | HTTP PORT | Set the HTTP port. Default: `8080`                  |
-| -k    | --key                  | KEY       | The key to access the API. Default: `prouteur`      |
-| -V    | --version              |           | Print version.                                      |
+| short | long                   | value      | description                                               |
+|-------|------------------------|------------|-----------------------------------------------------------|
+| -h    | --help                 |            | Show help message.                                        |
+| -p    | --smtp-port            | SMTP PORTS | Set the SMTP port. Default: `2525`  Example: `25,587,465` |
+|       | --http-port            | HTTP PORT  | Set the HTTP port. Default: `8080`                        |
+| -k    | --key                  | KEY        | The key to access the API. Default: `prouteur`            |
+| -V    | --version              |            | Print version.                                            |
 
 ## Panel
 The panel is accessible via `/panel?k=your_key`

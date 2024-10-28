@@ -24,7 +24,6 @@ async fn main() -> Result<(), SharedError> {
     if args.help {
         Printer::new(Args::command())
             .with("introduction", INTRO)
-            .without("author")
             .print_help();
 
         print_api_usage();
@@ -36,25 +35,23 @@ async fn main() -> Result<(), SharedError> {
 
     let db_clone = db.clone();
     let tls_clone = tls_config.clone();
-    let smtp_handle =
-        task::spawn(
-            async move { run_smtp_service(tls_clone.clone(), db_clone, args.smtp_port).await },
-        );
+    args.smtp_port.split(',')
+        .map(|port| port.parse::<u16>().expect("Wrong ports"))
+        .for_each(|port| {
+            let tls = tls_clone.clone();
+            let db = db_clone.clone();
+            task::spawn(
+                    async move { run_smtp_service(tls, db, port).await },
+                );
+        });
+
 
     let db_clone = db.clone();
     let key = args.key.clone();
     let service_handle =
-        task::spawn(async move { run_http_service(db_clone, args.http_port, key.clone()).await });
+        task::spawn(async move { run_http_service(db_clone, args.http_ports, key.clone()).await });
 
-    let secondary_smtp_handle = if let Some(port) = args.secondary_smtp_port {
-        let tls_config = tls_config.clone();
-        let db = db.clone();
-        Some(task::spawn(async move {
-            run_smtp_service(tls_config, db, port).await
-        }))
-    } else {
-        None
-    };
+
 
     match args.lifetime {
         Some(lifetime) => {
@@ -66,18 +63,13 @@ async fn main() -> Result<(), SharedError> {
 
     println!(
         "Panel: http://localhost:{}/panel?k={}",
-        args.http_port, args.key
+        args.http_ports, args.key
     );
 
     // wait for all services to complete (it should never happen)
-    match secondary_smtp_handle {
-        Some(handle) => {
-            let _ = tokio::try_join!(smtp_handle, service_handle, handle)?;
-        }
-        None => {
-            let _ = tokio::try_join!(smtp_handle, service_handle)?;
-        }
-    }
+
+    let _ = tokio::try_join!(service_handle)?;
+
 
     eprintln!("All services have completed unexpectedly ...");
 

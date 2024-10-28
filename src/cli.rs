@@ -7,19 +7,18 @@ pub struct Args {
     #[arg(long, short)]
     pub help: bool,
 
-    #[arg(short = 'p', long, default_value = "2525", value_name = "SMTP PORT")]
-    pub smtp_port: u16,
-
     #[arg(
-        short,
+        short = 'p',
         long,
-        help = "Allows to bind the SMTP server to a secondary port",
-        value_name = "SMTP PORT"
+        default_value = "2525",
+        value_name = "SMTP PORTS",
+        help = "Example: `25,587,465`"
     )]
-    pub secondary_smtp_port: Option<u16>,
+    pub smtp_port: String,
+
 
     #[arg(long, default_value = "8080", value_name = "HTTP PORT")]
-    pub http_port: u16,
+    pub http_ports: u16,
 
     #[arg(
         short,

@@ -2,6 +2,7 @@
 name = "mail-sink"
 version = "0.1.0"
 edition = "2021"
+authors = ["UwUDev"]
 
 [dependencies]
 tokio = { version = "1.28.0", features = ["full"] }
